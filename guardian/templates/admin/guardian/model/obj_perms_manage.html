@@ -35,7 +35,6 @@
         {% endfor %}
         <div class="form-row user_permissions">
             <table id="user-permissions" class="object-perms">
-                <caption>{% trans "User permissions" %}</caption>
                 <thead>
                     <tr>
                         <th>{% trans "User" %}</th>
@@ -48,7 +47,7 @@
                 <tbody>
                     {% for user, user_perms in users_perms.items %}
                     <tr>
-                        <td>{{ user }}</td>
+                        <td>{{ user.get_full_name }} ({{ user.username }})</td>
                         {% for perm in model_perms %}
                         <td>
                             {% if perm.codename in user_perms %}
@@ -62,6 +61,12 @@
                             <a href="user-manage/{{ user.id|safe }}/">{% trans "Edit" %}</a>
                         </td>
                     </tr>
+                    {% empty %}
+                        <tr>
+                            <td>
+                                Use the search box below to search for users
+                            </td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -89,7 +94,6 @@
         {% endfor %}
         <div class="form-row user_permissions">
             <table id="group-permissions" class="object-perms">
-                <caption>{% trans "Group permissions" %}</caption>
                 <thead>
                     <tr>
                         <th>{% trans "Group" %}</th>
