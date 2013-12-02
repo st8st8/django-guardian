@@ -19,6 +19,7 @@ from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext, TemplateDoesNotExist
 from django.utils.http import urlquote
+from organizations.models import Organization
 
 from guardian.compat import get_user_model
 from guardian.conf import settings as guardian_settings
@@ -71,11 +72,13 @@ def get_identity(identity):
         identity = get_anonymous_user()
 
     if isinstance(identity, get_user_model()):
-        return identity, None
+        return identity, None, None
     elif isinstance(identity, Group):
-        return None, identity
+        return None, identity, None
+    elif isinstance(identity, Organization):
+        return None, None, identity
 
-    raise NotUserNorGroup("User/AnonymousUser or Group instance is required "
+    raise NotUserNorGroup("User/AnonymousUser or Group/Organization instance is required "
         "(got %s)" % identity)
 
 
@@ -125,12 +128,13 @@ def clean_orphan_obj_perms():
     """
     from guardian.models import UserObjectPermission
     from guardian.models import GroupObjectPermission
+    from guardian.models import OrganizationObjectPermission
 
 
     deleted = 0
     # TODO: optimise
     for perm in chain(UserObjectPermission.objects.all(),
-        GroupObjectPermission.objects.all()):
+        GroupObjectPermission.objects.all(), OrganizationObjectPermission.objects.all()):
         if perm.content_object is None:
             logger.debug("Removing %s (pk=%d)" % (perm, perm.pk))
             perm.delete()
@@ -184,3 +188,12 @@ def get_group_obj_perms_model(obj):
     from guardian.models import GroupObjectPermissionBase
     from guardian.models import GroupObjectPermission
     return get_obj_perms_model(obj, GroupObjectPermissionBase, GroupObjectPermission)
+
+
+def get_organization_obj_perms_model(obj):
+    """
+    Returns model class that connects given ``obj`` and Group class.
+    """
+    from guardian.models import OrganizationObjectPermissionBase
+    from guardian.models import OrganizationObjectPermission
+    return get_obj_perms_model(obj, OrganizationObjectPermissionBase, OrganizationObjectPermission)

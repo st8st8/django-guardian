@@ -11,6 +11,7 @@ from django.contrib.auth.models import Group, AnonymousUser
 from django.template import get_library
 from django.template import InvalidTemplateLibrary
 from django.template.defaulttags import LoadNode
+from kombu.tests.utils import module_exists
 
 from guardian.compat import get_user_model
 from guardian.exceptions import NotUserNorGroup
@@ -18,6 +19,10 @@ from guardian.core import ObjectPermissionChecker
 
 register = template.Library()
 
+try:
+    from organizations.models import Organization
+except ImportError:
+    pass
 
 @register.tag
 def friendly_load(parser, token):
@@ -69,6 +74,9 @@ class ObjectPermissionsNode(template.Node):
             self.user = get_user_model().get_anonymous()
             self.group = None
         elif isinstance(for_whom, Group):
+            self.user = None
+            self.group = for_whom
+        elif module_exists(Organization) and isinstance(for_whom, Organization):
             self.user = None
             self.group = for_whom
         else:

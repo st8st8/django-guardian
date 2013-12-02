@@ -100,7 +100,7 @@
                         {% for perm in model_perms %}
                         <th>{{ perm.name }}</th>
                         {% endfor %}
-                        <th>{% trans "Action" %}</th>            
+                        <th>{% trans "Action" %}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -118,7 +118,7 @@
                         {% endfor %}
                         <td>
                             <a href="group-manage/{{ group.id|safe }}/">{% trans "Edit" %}</a>
-                        </td>            
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -129,6 +129,59 @@
         {% endfor %}
         <div>
             <input name="submit_manage_group" type="submit" value="{% trans "Manage group" %}"/>
+        </div>
+    </fieldset>
+</form>
+
+<form action="." method="post">
+    {% csrf_token %}
+    {% if group_form.errors %}
+    <div>
+        <p class="errornote">{% trans "Please correct the errors below." %}</p>
+    </div>
+    {% endif %}
+    <fieldset class="module aligned">
+        <h2>{% trans "Organizations" %}</h2>
+        {% for error in group_form.errors %}
+            <p class="error">{{ error }}</p>
+        {% endfor %}
+        <div class="form-row user_permissions">
+            <table id="organization-permissions" class="object-perms">
+                <thead>
+                    <tr>
+                        <th>{% trans "Organization" %}</th>
+                        {% for perm in model_perms %}
+                        <th>{{ perm.name }}</th>
+                        {% endfor %}
+                        <th>{% trans "Action" %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for organization, organization_perms in organizations_perms.items %}
+                    <tr>
+                        <td>{{ organization }}</td>
+                        {% for perm in model_perms %}
+                        <td>
+                            {% if perm.codename in group_perms %}
+                            {% include "admin/guardian/model/obj_perms_yes.html" %}
+                            {% else %}
+                            {% include "admin/guardian/model/obj_perms_no.html" %}
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        <td>
+                            <a href="organization-manage/{{ organization.id|safe }}/">{% trans "Edit" %}</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% for field in organization_form %}
+            {% include "admin/guardian/model/field.html" %}
+        {% endfor %}
+        <div>
+            <input name="submit_manage_organization" type="submit" value="{% trans "Manage organization" %}"/>
         </div>
     </fieldset>
 </form>

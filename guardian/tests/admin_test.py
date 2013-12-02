@@ -92,6 +92,7 @@ class AdminTests(TestCase):
         self.user = User.objects.create(username='negative_id_user', id=-2010)
         data = {'user': self.user.username, 'submit_manage_user': 'submit'}
         response = self.client.post(url, data, follow=True)
+        print response.content
         self.assertEqual(len(response.redirect_chain), 1)
         self.assertEqual(response.redirect_chain[0][1], 302)
         redirect_url = reverse('admin:%s_%s_permissions_manage_user' %

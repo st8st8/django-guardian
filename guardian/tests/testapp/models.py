@@ -15,7 +15,7 @@ class ProjectGroupObjectPermission(GroupObjectPermissionBase):
 
 class Project(models.Model):
     name = models.CharField(max_length=128, unique=True)
-    created_at = models.DateTimeField(default=datetime.now)
+    created_at = models.DateTimeField(default=datetime.utcnow)
 
     class Meta:
         get_latest_by = 'created_at'

@@ -14,6 +14,7 @@ from .other_test import *
 from .utils_test import *
 from .shortcuts_test import *
 from .tags_test import *
+from .orgs_tests import *
 
 
 if 'django.contrib.admin' in settings.INSTALLED_APPS:

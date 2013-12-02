@@ -30,18 +30,18 @@ class GetAnonymousUserTest(TestCase):
 class GetIdentityTest(ObjectPermissionTestCase):
 
     def test_user(self):
-        user, group = get_identity(self.user)
+        user, group, org = get_identity(self.user)
         self.assertTrue(isinstance(user, User))
         self.assertEqual(group, None)
 
     def test_anonymous_user(self):
         anon = AnonymousUser()
-        user, group = get_identity(anon)
+        user, group, org = get_identity(anon)
         self.assertTrue(isinstance(user, User))
         self.assertEqual(group, None)
 
     def test_group(self):
-        user, group = get_identity(self.group)
+        user, group, org = get_identity(self.group)
         self.assertTrue(isinstance(group, Group))
         self.assertEqual(user, None)
 

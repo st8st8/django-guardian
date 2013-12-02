@@ -10,13 +10,14 @@ from django.db import models
 from django.db.models import Q
 from django.shortcuts import _get_queryset
 from itertools import groupby
+from organizations.models import Organization
 
 from guardian.compat import get_user_model
 from guardian.compat import basestring
 from guardian.core import ObjectPermissionChecker
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import WrongAppError
-from guardian.utils import get_identity
+from guardian.utils import get_identity, get_organization_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
 import warnings
@@ -68,7 +69,7 @@ def assign_perm(perm, user_or_group, obj=None):
 
     """
 
-    user, group = get_identity(user_or_group)
+    user, group, organization = get_identity(user_or_group)
     # If obj is None we try to operate on global permissions
     if obj is None:
         try:
@@ -91,6 +92,9 @@ def assign_perm(perm, user_or_group, obj=None):
     if group:
         model = get_group_obj_perms_model(obj)
         return model.objects.assign_perm(perm, group, obj)
+    if organization:
+        model = get_organization_obj_perms_model(obj)
+        return model.objects.assign_perm(perm, organization, obj)
 
 def assign(perm, user_or_group, obj=None):
     """ Depreciated function name left in for compatibility"""
@@ -113,7 +117,7 @@ def remove_perm(perm, user_or_group=None, obj=None):
       global permission. Default is ``None``.
 
     """
-    user, group = get_identity(user_or_group)
+    user, group, organization = get_identity(user_or_group)
     if obj is None:
         try:
             app_label, codename = perm.split('.', 1)
@@ -128,6 +132,9 @@ def remove_perm(perm, user_or_group=None, obj=None):
         elif group:
             group.permissions.remove(perm)
             return
+        elif organization:
+            organization.permissions.remove(perm)
+            return
     perm = perm.split('.')[-1]
     if user:
         model = get_user_obj_perms_model(obj)
@@ -135,6 +142,10 @@ def remove_perm(perm, user_or_group=None, obj=None):
     if group:
         model = get_group_obj_perms_model(obj)
         model.objects.remove_perm(perm, group, obj)
+    if organization:
+        model = get_organization_obj_perms_model(obj)
+        model.objects.remove_perm(perm, organization, obj)
+
 
 def get_perms(user_or_group, obj):
     """
@@ -222,7 +233,7 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
             qset = qset | Q(**group_filters)
         if with_superusers:
             qset = qset | Q(is_superuser=True)
-        return get_user_model().objects.filter(qset).distinct()
+        return get_user_model().objects.filter(qset)
     else:
         # TODO: Do not hit db for each user!
         users = {}
@@ -281,6 +292,32 @@ def get_groups_with_perms(obj, attach_perms=False):
             if not group in groups:
                 groups[group] = sorted(get_perms(group, obj))
         return groups
+
+
+def get_organizations_with_perms(obj, attach_perms=False):
+    ctype = ContentType.objects.get_for_model(obj)
+    if not attach_perms:
+        # It's much easier without attached perms so we do it first if that is
+        # the case
+        org_model = get_organization_obj_perms_model(obj)
+        group_rel_name = org_model.organization.field.related_query_name()
+        if org_model.objects.is_generic():
+            group_filters = {
+                '%s__content_type' % group_rel_name: ctype,
+                '%s__object_pk' % group_rel_name: obj.pk,
+            }
+        else:
+            group_filters = {'%s__content_object' % group_rel_name: obj}
+        groups = Organization.objects.filter(**group_filters).distinct()
+        return groups
+    else:
+        # TODO: Do not hit db for each group!
+        groups = {}
+        for group in get_organizations_with_perms(obj):
+            if not group in groups:
+                groups[group] = sorted(get_perms(group, obj))
+        return groups
+
 
 def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=False):
     """

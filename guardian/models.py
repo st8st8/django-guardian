@@ -7,12 +7,13 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.generic import GenericForeignKey
 from django.utils.translation import ugettext_lazy as _
+from organizations.models import Organization
 
 from guardian.compat import get_user_model
 from guardian.compat import user_model_label
 from guardian.compat import unicode
 from guardian.utils import get_anonymous_user
-from guardian.managers import GroupObjectPermissionManager
+from guardian.managers import GroupObjectPermissionManager, OrganizationObjectPermissionManager
 from guardian.managers import UserObjectPermissionManager
 
 
@@ -46,7 +47,7 @@ class BaseGenericObjectPermission(models.Model):
     object_pk = models.CharField(_('object ID'), max_length=255)
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         abstract = True
 
@@ -87,6 +88,24 @@ class GroupObjectPermission(GroupObjectPermissionBase, BaseGenericObjectPermissi
         unique_together = ['group', 'permission', 'object_pk']
 
 
+class OrganizationObjectPermissionBase(BaseObjectPermission):
+    """
+    **Manager**: :manager:`GroupObjectPermissionManager`
+    """
+    organization = models.ForeignKey(Organization)
+
+    objects = OrganizationObjectPermissionManager()
+
+    class Meta:
+        abstract = True
+        unique_together = ['organization', 'permission', 'content_object']
+
+
+class OrganizationObjectPermission(OrganizationObjectPermissionBase, BaseGenericObjectPermission):
+    class Meta:
+        unique_together = ['organization', 'permission', 'object_pk']
+
+
 User = get_user_model()
 # Prototype User and Group methods
 setattr(User, 'get_anonymous', staticmethod(lambda: get_anonymous_user()))
@@ -99,3 +118,8 @@ setattr(Group, 'add_obj_perm',
     lambda self, perm, obj: GroupObjectPermission.objects.assign_perm(perm, self, obj))
 setattr(Group, 'del_obj_perm',
     lambda self, perm, obj: GroupObjectPermission.objects.remove_perm(perm, self, obj))
+
+setattr(Organization, 'add_obj_perm',
+    lambda self, perm, obj: OrganizationObjectPermission.objects.assign_perm(perm, self, obj))
+setattr(Organization, 'del_obj_perm',
+    lambda self, perm, obj: OrganizationObjectPermission.objects.remove_perm(perm, self, obj))

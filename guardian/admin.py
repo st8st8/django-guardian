@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 from django import forms
 from django.conf import settings
 from django.db.models import Q
+from organizations.models import Organization
 from guardian.compat import url, patterns
 from django.contrib import admin
 from django.contrib import messages
@@ -14,13 +15,14 @@ from django.utils.datastructures import SortedDict
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from guardian.compat import get_user_model
-from guardian.forms import UserObjectPermissionsForm
+from guardian.forms import UserObjectPermissionsForm, OrganizationObjectPermissionsForm
 from guardian.forms import GroupObjectPermissionsForm
-from guardian.shortcuts import get_perms
+from guardian.shortcuts import get_perms, get_organizations_with_perms
 from guardian.shortcuts import get_users_with_perms
 from guardian.shortcuts import get_groups_with_perms
 from guardian.shortcuts import get_perms_for_model
 from guardian.models import Group
+from organizations.managers import OrgManager
 
 
 class AdminUserObjectPermissionsForm(UserObjectPermissionsForm):
@@ -34,6 +36,16 @@ class AdminUserObjectPermissionsForm(UserObjectPermissionsForm):
 
 
 class AdminGroupObjectPermissionsForm(GroupObjectPermissionsForm):
+    """
+    Extends :form:`GroupObjectPermissionsForm`. It only overrides
+    ``get_obj_perms_field_widget`` method so it return
+    ``django.contrib.admin.widgets.FilteredSelectMultiple`` widget.
+    """
+    def get_obj_perms_field_widget(self):
+        return FilteredSelectMultiple(_("Permissions"), False)
+
+
+class AdminOrganizationObjectPermissionsForm(OrganizationObjectPermissionsForm):
     """
     Extends :form:`GroupObjectPermissionsForm`. It only overrides
     ``get_obj_perms_field_widget`` method so it return
@@ -121,10 +133,14 @@ class GuardedModelAdmin(admin.ModelAdmin):
         'admin/guardian/model/obj_perms_manage_user.html'
     obj_perms_manage_group_template = \
         'admin/guardian/model/obj_perms_manage_group.html'
+    obj_perms_manage_organization_template = \
+        'admin/guardian/model/obj_perms_manage_organization.html'
     user_can_access_owned_objects_only = False
     user_owned_objects_field = 'user'
     user_can_access_owned_by_group_objects_only = False
     group_owned_objects_field = 'group'
+    user_can_access_owned_by_organization_objects_only = False
+    organization_owned_objects_field = 'organization'
 
     def queryset(self, request):
         qs = super(GuardedModelAdmin, self).queryset(request)
@@ -140,6 +156,10 @@ class GuardedModelAdmin(admin.ModelAdmin):
             qs_key = '%s__%s' % (self.group_owned_objects_field, user_rel_name)
             filters = {qs_key: request.user}
             qs = qs.filter(**filters)
+        if self.user_can_access_owned_by_organization_objects_only:
+            User = get_user_model()
+            m = OrgManager()
+            qs = m.get_for_user(request.user)
         return qs
 
     def get_urls(self):
@@ -149,6 +169,7 @@ class GuardedModelAdmin(admin.ModelAdmin):
         - ``.../permissions/`` under ``app_mdodel_permissions`` url name (params: object_pk)
         - ``.../permissions/user-manage/<user_id>/`` under ``app_model_permissions_manage_user`` url name (params: object_pk, user_pk)
         - ``.../permissions/group-manage/<group_id>/`` under ``app_model_permissions_manage_group`` url name (params: object_pk, group_pk)
+        - ``.../permissions/organization-manage/<org_id>/`` under ``app_model_permissions_manage_organization`` url name (params: object_pk, org_pk)
 
         .. note::
            ``...`` above are standard, instance detail url (i.e.
@@ -169,6 +190,10 @@ class GuardedModelAdmin(admin.ModelAdmin):
                 view=self.admin_site.admin_view(
                     self.obj_perms_manage_group_view),
                 name='%s_%s_permissions_manage_group' % info),
+            url(r'^(?P<object_pk>.+)/permissions/organization-manage/(?P<organization_id>\-?\d+)/$',
+                view=self.admin_site.admin_view(
+                    self.obj_perms_manage_organization_view),
+                name='%s_%s_permissions_manage_organization' % info),
         )
         return myurls + urls
 
@@ -208,6 +233,9 @@ class GuardedModelAdmin(admin.ModelAdmin):
         groups_perms = SortedDict(
             get_groups_with_perms(obj, attach_perms=True))
         groups_perms.keyOrder.sort(key=lambda group: group.name)
+        organization_perms = SortedDict(
+            get_organizations_with_perms(obj, attach_perms=True))
+        organization_perms.keyOrder.sort(key=lambda group: group.name)
 
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
             user_form = UserManage(request.POST)
@@ -216,6 +244,7 @@ class GuardedModelAdmin(admin.ModelAdmin):
             user_form = UserManage({"user": request.session.get("admin_perm_user")})
 
         group_form = GroupManage()
+        organization_form = OrganizationManage()
         info = (
             self.admin_site.name,
             self.model._meta.app_label,
@@ -228,11 +257,27 @@ class GuardedModelAdmin(admin.ModelAdmin):
                 users_perms[user] = sorted(get_perms(user, obj))
             users_perms.keyOrder.sort(key=lambda user: user.get_full_name())
 
-           # url = reverse(
-           #     '%s:%s_%s_permissions_manage_user' % info,
-           #     args=[obj.pk, user_id]
-           # )
-           # return redirect(url)
+            # url = reverse(
+            #     '%s:%s_%s_permissions_manage_user' % info,
+            #     args=[obj.pk, user_id]
+            # )
+            # return redirect(url)
+        elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
+            user_form = UserManage()
+            group_form = GroupManage()
+            organization_form = OrganizationManage(request.POST)
+            info = (
+                self.admin_site.name,
+                self.model._meta.app_label,
+                self.model._meta.module_name
+            )
+            if organization_form.is_valid():
+                org_id = organization_form.cleaned_data['organization'].id
+                url = reverse(
+                    '%s:%s_%s_permissions_manage_organization' % info,
+                    args=[obj.pk, org_id]
+                )
+                return redirect(url)
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
             user_form = UserManage()
             group_form = GroupManage(request.POST)
@@ -251,12 +296,15 @@ class GuardedModelAdmin(admin.ModelAdmin):
         else:
             user_form = UserManage()
             group_form = GroupManage()
+            organization_form = OrganizationManage()
 
         context = self.get_obj_perms_base_context(request, obj)
         context['users_perms'] = users_perms
         context['groups_perms'] = groups_perms
+        context['organization_perms'] = organization_perms
         context['user_form'] = user_form
         context['group_form'] = group_form
+        context['organization_form'] = organization_form
 
         return render_to_response(self.get_obj_perms_manage_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
@@ -382,6 +430,46 @@ class GuardedModelAdmin(admin.ModelAdmin):
         return AdminGroupObjectPermissionsForm
 
 
+    def obj_perms_manage_organization_view(self, request, object_pk, organization_id):
+        """
+        Manages selected organization' permissions for current object.
+        """
+        organization = get_object_or_404(Organization, id=organization_id)
+        obj = get_object_or_404(self.queryset(request), pk=object_pk)
+        form_class = self.get_obj_perms_manage_organization_form()
+        form = form_class(organization, obj, request.POST or None)
+
+        if request.method == 'POST' and form.is_valid():
+            form.save_obj_perms()
+            msg = ugettext("Permissions saved.")
+            messages.success(request, msg)
+            info = (
+                self.admin_site.name,
+                self.model._meta.app_label,
+                self.model._meta.module_name
+            )
+            url = reverse(
+                '%s:%s_%s_permissions_manage_organization' % info,
+                args=[obj.pk, organization.id]
+            )
+            return redirect(url)
+
+        context = self.get_obj_perms_base_context(request, obj)
+        context['organization_obj'] = organization
+        context['organization_perms'] = get_perms(organization, obj)
+        context['form'] = form
+
+        return render_to_response(self.get_obj_perms_manage_organization_template(),
+            context, RequestContext(request, current_app=self.admin_site.name))
+
+
+    def get_obj_perms_manage_organization_template(self):
+        return self.obj_perms_manage_organization_template
+
+    def get_obj_perms_manage_organization_form(self):
+        return AdminOrganizationObjectPermissionsForm
+
+
 class UserManage(forms.Form):
     user = forms.RegexField(label=_("Username"), max_length=30,
         regex=r'^[\w.@+-]+$',
@@ -418,4 +506,21 @@ class GroupManage(forms.Form):
         except Group.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['group'].error_messages['does_not_exist'])
+
+
+class OrganizationManage(forms.Form):
+    organization = forms.CharField(max_length=80, error_messages={'does_not_exist':
+        _("This organization does not exist")})
+
+    def clean_organization(self):
+        """
+        Returns ``Group`` instance based on the given group name.
+        """
+        name = self.cleaned_data['organization']
+        try:
+            org = Organization.objects.get(name=name)
+            return org
+        except Organization.DoesNotExist:
+            raise forms.ValidationError(
+                self.fields['organization'].error_messages['does_not_exist'])
 

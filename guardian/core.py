@@ -6,7 +6,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
 
-from guardian.utils import get_identity
+from guardian.utils import get_identity, get_organization_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
 from guardian.compat import get_user_model
@@ -35,7 +35,7 @@ class ObjectPermissionChecker(object):
         :param user_or_group: should be an ``User``, ``AnonymousUser`` or
           ``Group`` instance
         """
-        self.user, self.group = get_identity(user_or_group)
+        self.user, self.group, self.organization = get_identity(user_or_group)
         self._obj_perms_cache = {}
 
     def has_perm(self, perm, obj):
@@ -64,8 +64,8 @@ class ObjectPermissionChecker(object):
         User = get_user_model()
         ctype = ContentType.objects.get_for_model(obj)
         key = self.get_local_cache_key(obj)
-        if not key in self._obj_perms_cache:
-
+        if True:# not key in self._obj_perms_cache:
+            #Django groups
             group_model = get_group_obj_perms_model(obj)
             group_rel_name = group_model.permission.field.related_query_name()
             if self.user:
@@ -83,6 +83,25 @@ class ObjectPermissionChecker(object):
                 })
             else:
                 group_filters['%s__content_object' % group_rel_name] = obj
+
+            #Django organizations
+            organization_model = get_organization_obj_perms_model(obj)
+            organization_rel_name = organization_model.permission.field.related_query_name()
+            if self.user:
+                fieldname = '%s__organization__%s' % (
+                    organization_rel_name,
+                    "users",
+                )
+                organization_filters = {fieldname: self.user}
+            else:
+                organization_filters = {'%s__group' % group_rel_name: self.group}
+            if organization_model.objects.is_generic():
+                organization_filters.update({
+                    '%s__content_type' % organization_rel_name: ctype,
+                    '%s__object_pk' % organization_rel_name: obj.pk,
+                })
+            else:
+                organization_filters['%s__content_object' % organization_rel_name] = obj
 
             if self.user and not self.user.is_active:
                 return []
@@ -108,11 +127,18 @@ class ObjectPermissionChecker(object):
                 user_perms = user_perms_qs.values_list("codename", flat=True)
                 group_perms_qs = perms_qs.filter(**group_filters)
                 group_perms = group_perms_qs.values_list("codename", flat=True)
-                perms = list(set(chain(user_perms, group_perms)))
-            else:
+                organizations_perms_qs = perms_qs.filter(**organization_filters)
+                organization_perms = organizations_perms_qs.values_list("codename", flat=True)
+                perms = list(set(chain(user_perms, group_perms, organization_perms)))
+            elif self.group:
                 perms = list(set(chain(*Permission.objects
                     .filter(content_type=ctype)
                     .filter(**group_filters)
+                    .values_list("codename"))))
+            elif self.organization:
+                perms = list(set(chain(*Permission.objects
+                    .filter(content_type=ctype)
+                    .filter(**organization_filters)
                     .values_list("codename"))))
             self._obj_perms_cache[key] = perms
         return self._obj_perms_cache[key]

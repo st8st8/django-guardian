@@ -133,3 +133,61 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
         )
         return perms
 
+
+class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
+
+    def assign_perm(self, perm, organization, obj):
+        """
+        Assigns permission with given ``perm`` for an instance ``obj`` and
+        ``organization``.
+        """
+        if getattr(obj, 'pk', None) is None:
+            raise ObjectNotPersisted("Object %s needs to be persisted first"
+                % obj)
+        ctype = ContentType.objects.get_for_model(obj)
+        permission = Permission.objects.get(content_type=ctype, codename=perm)
+
+        kwargs = {'permission': permission, 'organization': organization}
+        if self.is_generic():
+            kwargs['content_type'] = ctype
+            kwargs['object_pk'] = obj.pk
+        else:
+            kwargs['content_object'] = obj
+        obj_perm, created = self.get_or_create(**kwargs)
+        return obj_perm
+
+    def assign(self, perm, user, obj):
+        """ Depreciated function name left in for compatibility"""
+        warnings.warn("UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 1.0.5 version.", DeprecationWarning)
+        return self.assign_perm(perm, user, obj)
+
+    def remove_perm(self, perm, organization, obj):
+        """
+        Removes permission ``perm`` for an instance ``obj`` and given ``organization``.
+        """
+        if getattr(obj, 'pk', None) is None:
+            raise ObjectNotPersisted("Object %s needs to be persisted first"
+                % obj)
+        filters = {
+            'permission__codename': perm,
+            'permission__content_type': ContentType.objects.get_for_model(obj),
+            'organization': organization,
+        }
+        if self.is_generic():
+            filters['object_pk'] = obj.pk
+        else:
+            filters['content_object__pk'] = obj.pk
+
+        self.filter(**filters).delete()
+
+    def get_for_object(self, organization, obj):
+        if getattr(obj, 'pk', None) is None:
+            raise ObjectNotPersisted("Object %s needs to be persisted first"
+                % obj)
+        ctype = ContentType.objects.get_for_model(obj)
+        perms = self.filter(
+            content_type = ctype,
+            organization = organization,
+        )
+        return perms
+
