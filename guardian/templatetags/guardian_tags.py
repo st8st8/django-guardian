@@ -11,7 +11,6 @@ from django.contrib.auth.models import Group, AnonymousUser
 from django.template import get_library
 from django.template import InvalidTemplateLibrary
 from django.template.defaulttags import LoadNode
-from kombu.tests.utils import module_exists
 
 from guardian.compat import get_user_model
 from guardian.exceptions import NotUserNorGroup
@@ -76,7 +75,7 @@ class ObjectPermissionsNode(template.Node):
         elif isinstance(for_whom, Group):
             self.user = None
             self.group = for_whom
-        elif module_exists(Organization) and isinstance(for_whom, Organization):
+        elif isinstance(for_whom, Organization):
             self.user = None
             self.group = for_whom
         else:
