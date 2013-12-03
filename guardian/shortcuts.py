@@ -427,6 +427,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     user_obj_perms = user_obj_perms_queryset.values_list(*fields)
     data = list(user_obj_perms)
     if use_groups:
+        #Groups
         group_model = get_group_obj_perms_model(queryset.model)
         group_filters = {
             'permission__content_type': ctype,
@@ -440,6 +441,21 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             fields = ['content_object__pk', 'permission__codename']
         groups_obj_perms = groups_obj_perms_queryset.values_list(*fields)
         data += list(groups_obj_perms)
+
+        #Orgs
+        organization_model = get_organization_obj_perms_model(queryset.model)
+        organization_filters = {
+            'permission__content_type': ctype,
+            'permission__codename__in': codenames,
+            'organization__users': user,
+        }
+        organizations_obj_perms_queryset = organization_model.objects.filter(**organization_filters)
+        if organization_model.objects.is_generic():
+            fields = ['object_pk', 'permission__codename']
+        else:
+            fields = ['content_object__pk', 'permission__codename']
+        organizations_obj_perms = organizations_obj_perms_queryset.values_list(*fields)
+        data += list(organizations_obj_perms)
     keyfunc = lambda t: t[0] # sorting/grouping by pk (first in result tuple)
     data = sorted(data, key=keyfunc)
     pk_list = []
