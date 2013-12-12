@@ -4,7 +4,6 @@ from itertools import chain
 
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Q
 
 from guardian.utils import get_identity, get_organization_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
