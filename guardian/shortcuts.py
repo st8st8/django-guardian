@@ -22,7 +22,7 @@ from guardian.utils import get_user_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
 import warnings
 
-def assign_perm(perm, user_or_group, obj=None):
+def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
     """
     Assigns permission to user/group and object pair.
 
@@ -88,13 +88,13 @@ def assign_perm(perm, user_or_group, obj=None):
     perm = perm.split('.')[-1]
     if user:
         model = get_user_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, user, obj)
+        return model.objects.assign_perm(perm, user, obj, renewal_period)
     if group:
         model = get_group_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, group, obj)
+        return model.objects.assign_perm(perm, group, obj, renewal_period)
     if organization:
         model = get_organization_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, organization, obj)
+        return model.objects.assign_perm(perm, organization, obj, renewal_period)
 
 def assign(perm, user_or_group, obj=None):
     """ Depreciated function name left in for compatibility"""

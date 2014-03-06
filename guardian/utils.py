@@ -24,6 +24,7 @@ from organizations.models import Organization
 from guardian.compat import get_user_model
 from guardian.conf import settings as guardian_settings
 from guardian.exceptions import NotUserNorGroup
+from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
@@ -198,3 +199,14 @@ def get_organization_obj_perms_model(obj):
     from guardian.models import OrganizationObjectPermissionBase
     from guardian.models import OrganizationObjectPermission
     return get_obj_perms_model(obj, OrganizationObjectPermissionBase, OrganizationObjectPermission)
+
+
+def calculate_permission_expiry(perm, renewal_period):
+    if not perm or not renewal_period:
+        return None
+
+    expiry = perm.permission_expiry
+    if expiry is None:
+        return datetime.utcnow() + renewal_period
+    else:
+        return expiry + renewal_period

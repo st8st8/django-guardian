@@ -8,6 +8,8 @@ from guardian.models import Permission
 import warnings
 
 # TODO: consolidate UserObjectPermissionManager and GroupObjectPermissionManager
+from guardian.utils import calculate_permission_expiry
+
 
 class BaseObjectPermissionManager(models.Manager):
 
@@ -21,7 +23,7 @@ class BaseObjectPermissionManager(models.Manager):
 
 class UserObjectPermissionManager(BaseObjectPermissionManager):
 
-    def assign_perm(self, perm, user, obj):
+    def assign_perm(self, perm, user, obj, renewal_period=None):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
         ``user``.
@@ -39,6 +41,9 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
         else:
             kwargs['content_object'] = obj
         obj_perm, created = self.get_or_create(**kwargs)
+
+        obj_perm.permission_expiry = calculate_permission_expiry(obj_perm, renewal_period)
+        obj_perm.save()
         return obj_perm
 
     def assign(self, perm, user, obj):
@@ -82,7 +87,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
 
 class GroupObjectPermissionManager(BaseObjectPermissionManager):
 
-    def assign_perm(self, perm, group, obj):
+    def assign_perm(self, perm, group, obj, renewal_period=None):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
         ``group``.
@@ -100,6 +105,8 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
         else:
             kwargs['content_object'] = obj
         obj_perm, created = self.get_or_create(**kwargs)
+        obj_perm.permission_expiry = calculate_permission_expiry(obj_perm, renewal_period)
+        obj_perm.save()
         return obj_perm
 
     def assign(self, perm, user, obj):
@@ -140,7 +147,7 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
 
 class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
 
-    def assign_perm(self, perm, organization, obj):
+    def assign_perm(self, perm, organization, obj, renewal_period=None):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
         ``organization``.
@@ -158,6 +165,8 @@ class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
         else:
             kwargs['content_object'] = obj
         obj_perm, created = self.get_or_create(**kwargs)
+        obj_perm.permission_expiry = calculate_permission_expiry(obj_perm, renewal_period)
+        obj_perm.save()
         return obj_perm
 
     def assign(self, perm, user, obj):
