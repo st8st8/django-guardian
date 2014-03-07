@@ -106,7 +106,7 @@ class ObjectPermissionChecker(object):
                 )
                 organization_filters = {fieldname: self.user}
             else:
-                organization_filters = {'%s__group' % group_rel_name: self.group}
+                organization_filters = {'%s__organization' % organization_rel_name: self.organization}
             if organization_model.objects.is_generic():
                 organization_filters.update({
                     '%s__content_type' % organization_rel_name: ctype,
