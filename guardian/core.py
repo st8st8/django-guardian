@@ -36,10 +36,10 @@ class ObjectPermissionChecker(object):
         :param user_or_group: should be an ``User``, ``AnonymousUser`` or
           ``Group`` instance
         """
-        self.user, self.group = get_identity(user_or_group)
+        self.user, self.group, self.organization = get_identity(user_or_group)
         self._obj_perms_cache = {}
 
-    def has_perm(self, perm, obj):
+    def has_perm(self, perm, obj, permission_expiry=False):
         """
         Checks if user/group has given permission for object.
 
@@ -67,7 +67,6 @@ class ObjectPermissionChecker(object):
         User = get_user_model()
         ctype = ContentType.objects.get_for_model(obj)
         key = self.get_local_cache_key(obj)
-        if not key in self._obj_perms_cache:
 
         group_q = ()
         org_q = ()

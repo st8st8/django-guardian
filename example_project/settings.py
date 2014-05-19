@@ -37,6 +37,7 @@ INSTALLED_APPS = (
     'guardian',
     'guardian.testapp',
     'posts',
+    'organizations',
     'core',
     'integration_tests',
 )

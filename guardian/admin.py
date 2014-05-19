@@ -188,18 +188,21 @@ class GuardedModelAdminMixin(object):
             self.model._meta.app_label,
             self.model._meta.module_name
         )
-        if user_form.is_valid():
-            users = user_form.cleaned_data['user']
-            users_perms = SortedDict()
-            for user in users:
-                users_perms[user] = sorted(get_perms(user, obj))
-            users_perms.keyOrder.sort(key=lambda user: user.get_full_name())
-
-            # url = reverse(
-            #     '%s:%s_%s_permissions_manage_user' % info,
-            #     args=[obj.pk, user_id]
-            # )
-            # return redirect(url)
+        if request.method == 'POST' and 'submit_manage_user' in request.POST:
+            user_form = UserManage(request.POST)
+            group_form = GroupManage()
+            info = (
+                self.admin_site.name,
+                self.model._meta.app_label,
+                self.model._meta.module_name
+            )
+            if user_form.is_valid():
+                user_id = user_form.cleaned_data['user'].id
+                url = reverse(
+                    '%s:%s_%s_permissions_manage_user' % info,
+                    args=[obj.pk, user_id]
+                )
+                return redirect(url)
         elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
             user_form = UserManage()
             group_form = GroupManage()
