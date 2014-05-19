@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 
-import warnings
-
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.query import QuerySet
 from django.test import TestCase
@@ -21,8 +20,11 @@ from guardian.shortcuts import get_objects_for_group
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import NotUserNorGroup
 from guardian.exceptions import WrongAppError
-from guardian.tests.core_test import ObjectPermissionTestCase
+from guardian.testapp.tests.core_test import ObjectPermissionTestCase
 from guardian.models import Group, Permission
+
+import warnings
+
 
 User = get_user_model()
 user_app_label = User._meta.app_label
@@ -418,6 +420,19 @@ class GetObjectsForUser(TestCase):
             ['contenttypes.change_contenttype'], ctypes)
         self.assertEqual(set(ctypes), set(objects))
 
+    def test_anonymous(self):
+        self.user = AnonymousUser()
+        ctypes = ContentType.objects.all()
+        objects = get_objects_for_user(self.user,
+            ['contenttypes.change_contenttype'], ctypes)
+
+        obj1 = ContentType.objects.create(name='ct1', model='foo',
+            app_label='guardian-tests')
+        assign_perm('change_contenttype', self.user, obj1)
+        objects = get_objects_for_user(self.user,
+            ['contenttypes.change_contenttype'], ctypes)
+        self.assertEqual(set([obj1]), set(objects))
+
     def test_mixed_perms(self):
         codenames = [
             get_user_permission_full_codename('change'),
@@ -506,6 +521,21 @@ class GetObjectsForUser(TestCase):
             set(objects.values_list('name', flat=True)),
             set([groups[1].name]))
 
+    def test_multiple_perms_to_check_no_groups(self):
+        group_names = ['group1', 'group2', 'group3']
+        groups = [Group.objects.create(name=name) for name in group_names]
+        for group in groups:
+            assign_perm('auth.change_group', self.user, group)
+        assign_perm('auth.delete_group', self.user, groups[1])
+
+        objects = get_objects_for_user(self.user, ['auth.change_group',
+            'auth.delete_group'], use_groups=False)
+        self.assertEqual(len(objects), 1)
+        self.assertTrue(isinstance(objects, QuerySet))
+        self.assertEqual(
+            set(objects.values_list('name', flat=True)),
+            set([groups[1].name]))
+
     def test_any_of_multiple_perms_to_check(self):
         group_names = ['group1', 'group2', 'group3']
         groups = [Group.objects.create(name=name) for name in group_names]
@@ -529,36 +559,36 @@ class GetObjectsForUser(TestCase):
             self.user.groups.add(group)
 
         # Objects to operate on
-        ctypes = dict(((ct.id, ct) for ct in ContentType.objects.all()))
+        ctypes = list(ContentType.objects.all().order_by('id'))
 
+        assign_perm('change_contenttype', self.user, ctypes[0])
         assign_perm('change_contenttype', self.user, ctypes[1])
-        assign_perm('change_contenttype', self.user, ctypes[2])
+        assign_perm('delete_contenttype', self.user, ctypes[1])
         assign_perm('delete_contenttype', self.user, ctypes[2])
-        assign_perm('delete_contenttype', self.user, ctypes[3])
 
-        assign_perm('change_contenttype', groups[0], ctypes[4])
-        assign_perm('change_contenttype', groups[1], ctypes[4])
-        assign_perm('change_contenttype', groups[2], ctypes[5])
-        assign_perm('delete_contenttype', groups[0], ctypes[1])
+        assign_perm('change_contenttype', groups[0], ctypes[3])
+        assign_perm('change_contenttype', groups[1], ctypes[3])
+        assign_perm('change_contenttype', groups[2], ctypes[4])
+        assign_perm('delete_contenttype', groups[0], ctypes[0])
 
         objects = get_objects_for_user(self.user,
             ['contenttypes.change_contenttype'])
         self.assertEqual(
             set(objects.values_list('id', flat=True)),
-            set([1, 2, 4, 5]))
+            set(ctypes[i].id for i in [0, 1, 3, 4]))
 
         objects = get_objects_for_user(self.user,
             ['contenttypes.change_contenttype',
             'contenttypes.delete_contenttype'])
         self.assertEqual(
             set(objects.values_list('id', flat=True)),
-            set([1, 2]))
+            set(ctypes[i].id for i in [0, 1]))
 
         objects = get_objects_for_user(self.user,
             ['contenttypes.change_contenttype'])
         self.assertEqual(
             set(objects.values_list('id', flat=True)),
-            set([1, 2, 4, 5]))
+            set(ctypes[i].id for i in [0, 1, 3, 4]))
 
 class GetObjectsForGroup(TestCase):
     """

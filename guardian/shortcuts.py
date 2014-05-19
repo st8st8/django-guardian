@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.shortcuts import _get_queryset
 from itertools import groupby
 from organizations.models import Organization
@@ -17,7 +17,8 @@ from guardian.compat import basestring
 from guardian.core import ObjectPermissionChecker
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import WrongAppError
-from guardian.utils import get_identity, get_organization_obj_perms_model
+from guardian.utils import get_anonymous_user
+from guardian.utils import get_identity,  get_organization_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
 import warnings
@@ -98,7 +99,7 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
 
 def assign(perm, user_or_group, obj=None):
     """ Depreciated function name left in for compatibility"""
-    warnings.warn("Shortcut function 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 1.0.5 version.", DeprecationWarning)
+    warnings.warn("Shortcut function 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.", DeprecationWarning)
     return assign_perm(perm, user_or_group, obj)
 
 def remove_perm(perm, user_or_group=None, obj=None):
@@ -233,7 +234,7 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
             qset = qset | Q(**group_filters)
         if with_superusers:
             qset = qset | Q(is_superuser=True)
-        return get_user_model().objects.filter(qset)
+        return get_user_model().objects.filter(qset).distinct()
     else:
         # TODO: Do not hit db for each user!
         users = {}
@@ -324,7 +325,8 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     Returns queryset of objects for which a given ``user`` has *all*
     permissions present at ``perms``.
 
-    :param user: ``User`` instance for which objects would be returned
+    :param user: ``User`` or ``AnonymousUser`` instance for which objects would
+      be returned.
     :param perms: single permission string, or sequence of permission strings
       which should be checked.
       If ``klass`` parameter is not given, those should be full permission
@@ -415,6 +417,12 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     if user.is_superuser:
         return queryset
 
+    # Check if the user is anonymous. The
+    # django.contrib.auth.models.AnonymousUser object doesn't work for queries
+    # and it's nice to be able to pass in request.user blindly.
+    if user.is_anonymous():
+        user = get_anonymous_user()
+
     # Now we should extract list of pk values for which we would filter queryset
     user_model = get_user_obj_perms_model(queryset.model)
     user_obj_perms_queryset = (user_model.objects
@@ -425,8 +433,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         fields = ['object_pk', 'permission__codename']
     else:
         fields = ['content_object__pk', 'permission__codename']
-    user_obj_perms = user_obj_perms_queryset.values_list(*fields)
-    data = list(user_obj_perms)
+
     if use_groups:
         #Groups
         group_model = get_group_obj_perms_model(queryset.model)
@@ -440,8 +447,19 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             fields = ['object_pk', 'permission__codename']
         else:
             fields = ['content_object__pk', 'permission__codename']
-        groups_obj_perms = groups_obj_perms_queryset.values_list(*fields)
-        data += list(groups_obj_perms)
+        if not any_perm:
+            user_obj_perms = user_obj_perms_queryset.values_list(*fields)
+            groups_obj_perms = groups_obj_perms_queryset.values_list(*fields)
+            data = list(user_obj_perms) + list(groups_obj_perms)
+            keyfunc = lambda t: t[0] # sorting/grouping by pk (first in result tuple)
+            data = sorted(data, key=keyfunc)
+            pk_list = []
+            for pk, group in groupby(data, keyfunc):
+                obj_codenames = set((e[1] for e in group))
+                if codenames.issubset(obj_codenames):
+                    pk_list.append(pk)
+            objects = queryset.filter(pk__in=pk_list)
+            return objects
 
         #Orgs
         organization_model = get_organization_obj_perms_model(queryset.model)
@@ -465,7 +483,20 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         if any_perm or codenames.issubset(obj_codenames):
             pk_list.append(pk)
 
-    objects = queryset.filter(pk__in=pk_list)
+    if not any_perm:
+        counts = user_obj_perms_queryset.values(fields[0]).annotate(object_pk_count=Count(fields[0]))
+        user_obj_perms_queryset = counts.filter(object_pk_count__gte=len(codenames))
+
+    values = user_obj_perms_queryset.values_list(fields[0], flat=True)
+    if user_model.objects.is_generic():
+        values = [int(v) for v in values]
+    objects = queryset.filter(pk__in=values)
+    if use_groups:
+        values = groups_obj_perms_queryset.values_list(fields[0], flat=True)
+        if group_model.objects.is_generic():
+            values = [int(v) for v in values]
+        objects |= queryset.filter(pk__in=values)
+
     return objects
 
 def get_objects_for_group(group, perms, klass=None, any_perm=False):

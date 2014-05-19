@@ -5,10 +5,11 @@ from django.contrib.auth.models import Group, AnonymousUser
 from django.db import models
 
 from guardian.compat import get_user_model
-from guardian.tests.core_test import ObjectPermissionTestCase
-from guardian.tests.testapp.models import Project
-from guardian.tests.testapp.models import ProjectUserObjectPermission
-from guardian.tests.testapp.models import ProjectGroupObjectPermission
+from guardian.testapp.tests.conf import skipUnlessTestApp
+from guardian.testapp.tests.core_test import ObjectPermissionTestCase
+from guardian.testapp.models import Project
+from guardian.testapp.models import ProjectUserObjectPermission
+from guardian.testapp.models import ProjectGroupObjectPermission
 from guardian.models import UserObjectPermission
 from guardian.models import UserObjectPermissionBase
 from guardian.models import GroupObjectPermission
@@ -30,18 +31,18 @@ class GetAnonymousUserTest(TestCase):
 class GetIdentityTest(ObjectPermissionTestCase):
 
     def test_user(self):
-        user, group, org = get_identity(self.user)
+        user, group = get_identity(self.user)
         self.assertTrue(isinstance(user, User))
         self.assertEqual(group, None)
 
     def test_anonymous_user(self):
         anon = AnonymousUser()
-        user, group, org = get_identity(anon)
+        user, group = get_identity(anon)
         self.assertTrue(isinstance(user, User))
         self.assertEqual(group, None)
 
     def test_group(self):
-        user, group, org = get_identity(self.group)
+        user, group = get_identity(self.group)
         self.assertTrue(isinstance(group, Group))
         self.assertEqual(user, None)
 
@@ -51,6 +52,7 @@ class GetIdentityTest(ObjectPermissionTestCase):
         self.assertRaises(NotUserNorGroup, get_identity, User)
 
 
+@skipUnlessTestApp
 class GetUserObjPermsModelTest(TestCase):
 
     def test_for_instance(self):
@@ -73,6 +75,7 @@ class GetUserObjPermsModelTest(TestCase):
             UserObjectPermission)
 
 
+@skipUnlessTestApp
 class GetGroupObjPermsModelTest(TestCase):
 
     def test_for_instance(self):
@@ -99,7 +102,7 @@ class GetObjPermsModelTest(TestCase):
     def test_image_field(self):
 
         class SomeModel(models.Model):
-            image = models.ImageField(upload_to='images/')
+            image = models.FileField(upload_to='images/')
 
         obj = SomeModel()
         perm_model = get_obj_perms_model(obj, UserObjectPermissionBase,
@@ -108,10 +111,10 @@ class GetObjPermsModelTest(TestCase):
 
     def test_file_field(self):
 
-        class SomeModel(models.Model):
+        class SomeModel2(models.Model):
             file = models.FileField(upload_to='images/')
 
-        obj = SomeModel()
+        obj = SomeModel2()
         perm_model = get_obj_perms_model(obj, UserObjectPermissionBase,
             UserObjectPermission)
         self.assertEqual(perm_model, UserObjectPermission)

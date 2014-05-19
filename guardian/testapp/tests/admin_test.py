@@ -15,10 +15,11 @@ from guardian.compat import get_user_model
 from guardian.compat import str
 from guardian.shortcuts import get_perms
 from guardian.shortcuts import get_perms_for_model
-from guardian.tests.conf import TEST_SETTINGS
-from guardian.tests.conf import override_settings
+from guardian.testapp.tests.conf import TEST_SETTINGS
+from guardian.testapp.tests.conf import override_settings
 from guardian.models import Group
-from guardian.tests.testapp.models import LogEntryWithGroup as LogEntry
+from guardian.testapp.tests.conf import skipUnlessTestApp
+from guardian.testapp.models import LogEntryWithGroup as LogEntry
 
 User = get_user_model()
 
@@ -92,7 +93,6 @@ class AdminTests(TestCase):
         self.user = User.objects.create(username='negative_id_user', id=-2010)
         data = {'user': self.user.username, 'submit_manage_user': 'submit'}
         response = self.client.post(url, data, follow=True)
-        print response.content
         self.assertEqual(len(response.redirect_chain), 1)
         self.assertEqual(response.redirect_chain[0][1], 302)
         redirect_url = reverse('admin:%s_%s_permissions_manage_user' %
@@ -288,6 +288,7 @@ if 'django.contrib.admin' not in settings.INSTALLED_APPS:
     AdminTests = type('AdminTests', (TestCase,), {}) # pyflakes:ignore
 
 
+@skipUnlessTestApp
 class GuardedModelAdminTests(TestCase):
 
     def _get_gma(self, attrs=None, name=None, model=None):

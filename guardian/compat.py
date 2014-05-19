@@ -4,6 +4,9 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.auth.models import AnonymousUser
+from django.utils.importlib import import_module
+import six
+import sys
 
 try:
     from django.conf.urls import url, patterns, include, handler404, handler500
@@ -16,13 +19,31 @@ __all__ = [
     'Permission',
     'AnonymousUser',
     'get_user_model',
+    'import_string',
     'user_model_label',
     'url',
     'patterns',
     'include',
     'handler404',
-    'handler500'
+    'handler500',
+    'mock',
+    'unittest',
 ]
+
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest  # pyflakes:ignore
+try:
+    from unittest import mock  # Since Python 3.3 mock is is in stdlib
+except ImportError:
+    try:
+        import mock # pyflakes:ignore
+    except ImportError:
+        # mock is used for tests only however it is hard to check if user is
+        # running tests or production code so we fail silently here; mock is
+        # still required for tests at setup.py (See PR #193)
+        pass
 
 # Django 1.5 compatibility utilities, providing support for custom User models.
 # Since get_user_model() causes a circular import if called when app models are
@@ -62,6 +83,30 @@ def get_user_permission_codename(perm):
     """
     return get_user_permission_full_codename(perm).split('.')[1]
 
+
+def import_string(dotted_path):
+    """
+    Import a dotted module path and return the attribute/class designated by the
+    last name in the path. Raise ImportError if the import failed.
+
+    Backported from Django 1.7
+    """
+    try:
+        module_path, class_name = dotted_path.rsplit('.', 1)
+    except ValueError:
+        msg = "%s doesn't look like a module path" % dotted_path
+        six.reraise(ImportError, ImportError(msg), sys.exc_info()[2])
+
+    module = import_module(module_path)
+
+    try:
+        return getattr(module, class_name)
+    except AttributeError:
+        msg = 'Module "%s" does not define a "%s" attribute/class' % (
+            dotted_path, class_name)
+        six.reraise(ImportError, ImportError(msg), sys.exc_info()[2])
+
+
 # Python 3
 try:
     unicode = unicode # pyflakes:ignore
@@ -69,5 +114,18 @@ try:
     str = str # pyflakes:ignore
 except NameError:
     basestring = unicode = str = str
+
+# Django 1.7 compatibility
+# create_permission API changed: skip the create_models (second
+# positional argument) if we have django 1.7+ and 2+ positional
+# arguments with the second one being a list/tuple 
+def create_permissions(*args, **kwargs):
+    from django.contrib.auth.management import create_permissions as original_create_permissions
+    import django
+
+    if django.get_version().split('.')[:2] >= ['1','7'] and \
+        len(args) > 1 and isinstance(args[1], (list, tuple)):
+        args = args[:1] + args[2:]
+    return original_create_permissions(*args, **kwargs)
 
 __all__ = ['User', 'Group', 'Permission', 'AnonymousUser']

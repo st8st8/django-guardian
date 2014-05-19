@@ -5,6 +5,14 @@ from django.contrib.admin.models import LogEntry
 from guardian.models import UserObjectPermissionBase, GroupObjectPermissionBase
 
 
+class DynamicAccessor(object):
+    def __init__(self):
+        pass
+
+    def __getattr__(self, key):
+        return DynamicAccessor()
+
+
 class ProjectUserObjectPermission(UserObjectPermissionBase):
     content_object = models.ForeignKey('Project')
 
@@ -15,13 +23,15 @@ class ProjectGroupObjectPermission(GroupObjectPermissionBase):
 
 class Project(models.Model):
     name = models.CharField(max_length=128, unique=True)
-    created_at = models.DateTimeField(default=datetime.utcnow)
+    created_at = models.DateTimeField(default=datetime.now)
 
     class Meta:
         get_latest_by = 'created_at'
 
     def __unicode__(self):
         return self.name
+
+Project.not_a_relation_descriptor = DynamicAccessor()
 
 
 class MixedGroupObjectPermission(GroupObjectPermissionBase):

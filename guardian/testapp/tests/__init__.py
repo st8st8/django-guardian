@@ -9,12 +9,12 @@ from .decorators_test import *
 from .direct_rel_test import *
 from .forms_test import *
 from .managers_test import *
+from .management_test import *
 from .orphans_test import *
 from .other_test import *
 from .utils_test import *
 from .shortcuts_test import *
 from .tags_test import *
-from .orgs_tests import *
 
 
 if 'django.contrib.admin' in settings.INSTALLED_APPS:

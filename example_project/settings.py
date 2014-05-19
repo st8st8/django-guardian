@@ -34,15 +34,21 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'guardian',
-    'guardian.tests.testapp',
+    'guardian.testapp',
     'posts',
+    'core',
+    'integration_tests',
 )
 if django.VERSION < (1, 3):
     INSTALLED_APPS += ('staticfiles',)
 else:
     INSTALLED_APPS += ('django.contrib.staticfiles',)
+
+if 'GUARDIAN_NO_TESTS_APP' in os.environ:
+    _apps = list(INSTALLED_APPS)
+    _apps.remove('guardian.testapp')
+    INSTALLED_APPS = tuple(_apps)
 
 if TEST_SOUTH:
     INSTALLED_APPS += ('south',)
@@ -52,6 +58,12 @@ if 'GRAPPELLI' in os.environ:
         INSTALLED_APPS = ('grappelli',) + INSTALLED_APPS
     except ImportError:
         print("django-grappelli not installed")
+
+try:
+    import rosetta
+    INSTALLED_APPS += ('rosetta',)
+except ImportError:
+    pass
 
 #MIDDLEWARE_CLASSES = (
     #'django.middleware.common.CommonMiddleware',
@@ -100,6 +112,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 ANONYMOUS_USER_ID = -1
+GUARDIAN_GET_INIT_ANONYMOUS_USER = 'core.models.get_custom_anon_user'
 
 PASSWORD_HASHERS = (
     'django.contrib.auth.hashers.MD5PasswordHasher',
@@ -110,11 +123,7 @@ PASSWORD_HASHERS = (
 # are not migrated for tests
 SOUTH_TESTS_MIGRATE = TEST_SOUTH
 
-# Django >= 1.5 (earlier versoions would ignore this setting; we don't want this
-# however, to be set for earlier versions so we don't relay on it)
-if django.VERSION >= (1, 5):
-    INSTALLED_APPS += ('core',)
-    AUTH_USER_MODEL = 'core.CustomUser'
+AUTH_USER_MODEL = 'core.CustomUser'
 
 try:
     from conf.localsettings import *
