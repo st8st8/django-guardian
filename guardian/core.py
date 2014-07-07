@@ -11,7 +11,7 @@ from guardian.utils import get_identity, get_organization_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
 from guardian.compat import get_user_model
-
+from django.utils.timezone import utc
 
 class ObjectPermissionChecker(object):
     """
@@ -76,7 +76,7 @@ class ObjectPermissionChecker(object):
             group_rel_name = group_model.permission.field.related_query_name()
             if permission_expiry:
                 kwargs1 = {"%s__permission_expiry"%group_rel_name: None}
-                kwargs2 = {"%s__permission_expiry__lte"%group_rel_name: datetime.utcnow()}
+                kwargs2 = {"%s__permission_expiry__lte"%group_rel_name: datetime.utcnow().replace(tzinfo=utc)}
                 group_q = (Q(**kwargs1) | Q(**kwargs2),)
             if self.user:
                 fieldname = '%s__group__%s' % (
@@ -99,7 +99,7 @@ class ObjectPermissionChecker(object):
             organization_rel_name = organization_model.permission.field.related_query_name()
             if permission_expiry:
                 kwargs1 = {"%s__permission_expiry"%organization_rel_name: None}
-                kwargs2 = {"%s__permission_expiry__lte"%organization_rel_name: datetime.utcnow()}
+                kwargs2 = {"%s__permission_expiry__lte"%organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
                 org_q = (Q(**kwargs1) | Q(**kwargs2),)
             if self.user:
                 fieldname = '%s__organization__%s' % (
@@ -138,7 +138,7 @@ class ObjectPermissionChecker(object):
                 user_q = ()
                 if permission_expiry:
                     kwargs1 = {"%s__permission_expiry"%related_name: None}
-                    kwargs2 = {"%s__permission_expiry__gte"%related_name: datetime.utcnow()}
+                    kwargs2 = {"%s__permission_expiry__gte"%related_name: datetime.utcnow().replace(tzinfo=utc)}
                     user_q = (Q(**kwargs1) | Q(**kwargs2),)
                 # Query user and group permissions separately and then combine
                 # the results to avoid a slow query

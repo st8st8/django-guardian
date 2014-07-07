@@ -25,6 +25,7 @@ from guardian.compat import get_user_model
 from guardian.conf import settings as guardian_settings
 from guardian.exceptions import NotUserNorGroup
 from datetime import datetime
+from django.utils.timezone import utc
 
 
 logger = logging.getLogger(__name__)
@@ -200,6 +201,6 @@ def calculate_permission_expiry(perm, renewal_period):
 
     expiry = perm.permission_expiry
     if expiry is None:
-        return datetime.utcnow() + renewal_period
+        return (datetime.utcnow() + renewal_period).replace(tzinfo=utc)
     else:
-        return expiry + renewal_period
+        return expiry.replace(tzinfo=utc) + renewal_period
