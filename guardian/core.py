@@ -39,7 +39,7 @@ class ObjectPermissionChecker(object):
         self.user, self.group, self.organization = get_identity(user_or_group)
         self._obj_perms_cache = {}
 
-    def has_perm(self, perm, obj, permission_expiry=False):
+    def has_perm(self, perm, obj, permission_expiry=True):
         """
         Checks if user/group has given permission for object.
 
