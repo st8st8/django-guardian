@@ -162,12 +162,13 @@ class GuardedModelAdminMixin(object):
         forms presented within the page.
         """
         obj = get_object_or_404(self.queryset(request), pk=object_pk)
-        users_perms = SortedDict(
-            get_users_with_perms(obj, attach_perms=True,
-                with_group_users=False))
+        #users_perms = SortedDict(
+        #    get_users_with_perms(obj, attach_perms=True,
+        #        with_group_users=False))
 
-        users_perms.keyOrder.sort(key=lambda user:
-                                  getattr(user, get_user_model().USERNAME_FIELD))
+        #users_perms.keyOrder.sort(key=lambda user:
+        #                          getattr(user, get_user_model().USERNAME_FIELD))
+        users_perms = None
         groups_perms = SortedDict(
             get_groups_with_perms(obj, attach_perms=True))
         groups_perms.keyOrder.sort(key=lambda group: group.name)
@@ -190,19 +191,29 @@ class GuardedModelAdminMixin(object):
         )
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
             user_form = UserManage(request.POST)
-            group_form = GroupManage()
-            info = (
-                self.admin_site.name,
-                self.model._meta.app_label,
-                self.model._meta.module_name
-            )
-            if user_form.is_valid():
-                user_id = user_form.cleaned_data['user'].id
-                url = reverse(
-                    '%s:%s_%s_permissions_manage_user' % info,
-                    args=[obj.pk, user_id]
-                )
-                return redirect(url)
+            request.session["admin_perm_user"] = request.POST["user"]
+        else:
+            user_form = UserManage({"user": request.session.get("admin_perm_user")})
+
+        group_form = GroupManage()
+        info = (
+            self.admin_site.name,
+            self.model._meta.app_label,
+            self.model._meta.module_name
+        )
+        if user_form.is_valid():
+            users = user_form.cleaned_data['user']
+            users_perms = SortedDict()
+            for user in users:
+                users_perms[user] = sorted(get_perms(user, obj))
+            users_perms.keyOrder.sort(key=lambda user: user.get_full_name())
+
+           # url = reverse(
+           #     '%s:%s_%s_permissions_manage_user' % info,
+           #     args=[obj.pk, user_id]
+           # )
+          # return redirect(url)
+
         elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
             user_form = UserManage()
             group_form = GroupManage()
@@ -501,15 +512,16 @@ class UserManage(forms.Form):
         """
         Returns ``User`` instance based on the given identification.
         """
-        identification = self.cleaned_data['user']
+        s = self.cleaned_data['user']
         user_model = get_user_model()
         try:
             username_field = user_model.USERNAME_FIELD
         except AttributeError:
             username_field = 'username'
         try:
-            user = user_model.objects.get(**{username_field: identification})
-            return user
+            users = get_user_model().objects.filter(Q(username__icontains=s)| Q(first_name__icontains=s)|Q(last_name__icontains=s))[:20]
+            return users
+
         except user_model.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['user'].error_messages['does_not_exist'])
