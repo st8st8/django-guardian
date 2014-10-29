@@ -560,3 +560,13 @@ class OrganizationManage(forms.Form):
             raise forms.ValidationError(
                 self.fields['organization'].error_messages['does_not_exist'])
 
+
+class UserObjectPermissionAdmin(ModelAdmin):
+    list_display = ["permission", "user", "permission_expiry"]
+    search_fields = ["user__username", "user__email", "permission__codename"]
+    pass
+
+admin.site.register(UserObjectPermission, UserObjectPermissionAdmin)
+
+
+
