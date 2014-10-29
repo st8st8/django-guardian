@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 from django import forms
 from django.conf import settings
+from django.contrib.admin import ModelAdmin
 from django.db.models import Q
 from organizations.models import Organization
 from guardian.compat import url, patterns
@@ -21,7 +22,7 @@ from guardian.shortcuts import get_perms, get_organizations_with_perms
 from guardian.shortcuts import get_users_with_perms
 from guardian.shortcuts import get_groups_with_perms
 from guardian.shortcuts import get_perms_for_model
-from guardian.models import Group
+from guardian.models import Group, UserObjectPermission
 from organizations.managers import OrgManager
 
 
@@ -567,6 +568,3 @@ class UserObjectPermissionAdmin(ModelAdmin):
     pass
 
 admin.site.register(UserObjectPermission, UserObjectPermissionAdmin)
-
-
-
