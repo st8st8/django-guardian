@@ -77,8 +77,8 @@ class GuardedModelAdminMixin(object):
     organization_owned_objects_field = 'organization'
     include_object_permissions_urls = True
 
-    def queryset(self, request):
-        qs = super(GuardedModelAdminMixin, self).queryset(request)
+    def get_queryset(self, request):
+        qs = super(GuardedModelAdminMixin, self).get_queryset(request)
         if request.user.is_superuser:
             return qs
 
