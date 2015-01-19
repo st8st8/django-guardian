@@ -78,7 +78,13 @@ class GuardedModelAdminMixin(object):
     include_object_permissions_urls = True
 
     def get_queryset(self, request):
-        qs = super(GuardedModelAdminMixin, self).get_queryset(request)
+        # Prefer the Django >= 1.6 interface but maintain
+        # backward compatibility
+        method = getattr(
+            super(GuardedModelAdminMixin, self), 'get_queryset',
+            super(GuardedModelAdminMixin, self).queryset)
+        qs = method(request)
+
         if request.user.is_superuser:
             return qs
 
@@ -97,6 +103,12 @@ class GuardedModelAdminMixin(object):
             qs = m.get_for_user(request.user)
         return qs
 
+    # Allow queryset method as fallback for Django versions < 1.6
+    # for versions >= 1.6 this is taken care of by Django itself
+    # and triggers a warning message automatically.
+    import django
+    if django.VERSION < (1, 6):
+        queryset = get_queryset
 
     def get_urls(self):
         """
@@ -280,7 +292,7 @@ class GuardedModelAdminMixin(object):
         """
         Manages selected users' permissions for current object.
         """
-        user = get_object_or_404(get_user_model(), id=user_id)
+        user = get_object_or_404(get_user_model(), pk=user_id)
         obj = get_object_or_404(self.queryset(request), pk=object_pk)
         form_class = self.get_obj_perms_manage_user_form()
         form = form_class(user, obj, request.POST or None)
@@ -296,7 +308,7 @@ class GuardedModelAdminMixin(object):
             )
             url = reverse(
                 '%s:%s_%s_permissions_manage_user' % info,
-                args=[obj.pk, user.id]
+                args=[obj.pk, user.pk]
             )
             return redirect(url)
 
@@ -513,16 +525,15 @@ class UserManage(forms.Form):
         """
         Returns ``User`` instance based on the given identification.
         """
-        s = self.cleaned_data['user']
+        identification = self.cleaned_data['user']
         user_model = get_user_model()
         try:
             username_field = user_model.USERNAME_FIELD
         except AttributeError:
             username_field = 'username'
         try:
-            users = get_user_model().objects.filter(Q(username__icontains=s)| Q(first_name__icontains=s)|Q(last_name__icontains=s))[:20]
-            return users
-
+            user = user_model.objects.get(**{username_field: identification})
+            return user
         except user_model.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['user'].error_messages['does_not_exist'])
@@ -544,27 +555,3 @@ class GroupManage(forms.Form):
             raise forms.ValidationError(
                 self.fields['group'].error_messages['does_not_exist'])
 
-
-class OrganizationManage(forms.Form):
-    organization = forms.CharField(max_length=80, error_messages={'does_not_exist':
-        _("This organization does not exist")})
-
-    def clean_organization(self):
-        """
-        Returns ``Group`` instance based on the given group name.
-        """
-        name = self.cleaned_data['organization']
-        try:
-            org = Organization.objects.get(name=name)
-            return org
-        except Organization.DoesNotExist:
-            raise forms.ValidationError(
-                self.fields['organization'].error_messages['does_not_exist'])
-
-
-class UserObjectPermissionAdmin(ModelAdmin):
-    list_display = ["permission", "user", "permission_expiry"]
-    search_fields = ["user__username", "user__email", "permission__codename"]
-    pass
-
-admin.site.register(UserObjectPermission, UserObjectPermissionAdmin)

@@ -1,10 +1,15 @@
 import os
 import random
 import string
+import django
 
 DEBUG = False
 
 ANONYMOUS_USER_ID = -1
+
+if django.VERSION >= (1, 5):
+    AUTH_USER_MODEL = "testapp.CustomUser"
+    GUARDIAN_MONKEY_PATCH = False
 
 INSTALLED_APPS = (
     'django.contrib.auth',
@@ -20,6 +25,14 @@ INSTALLED_APPS = (
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
     'guardian.backends.ObjectPermissionBackend',
+)
+
+# this fixes warnings in django 1.7
+MIDDLEWARE_CLASSES = (
+    'django.middleware.common.CommonMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
 )
 
 TEST_RUNNER = 'django.test.simple.DjangoTestSuiteRunner'

@@ -1,3 +1,38 @@
+Release 1.2.5 (Dec 28, 2014)
+============================
+
+* Official Django 1.7 support (thanks Troy Grosfield and Brian May)
+* Allow to override ``PermissionRequiredMixin.get_permission_object``, part
+  of ``PermissionRequiredMixin.check_permissions`` method, responsible for
+  retrieving single object (Thanks zauddelig)
+* French translations (Thanks Morgan Aubert)
+* Added support for ``User.get_all_permissions`` (thanks Michael Drescher)
+
+Release 1.2.4 (Jul 14, 2014)
+============================
+
+* Fixed another issue with custom primary keys at admin extensions (Thanks Omer
+  Katz)
+
+
+Release 1.2.3 (Jul 14, 2014)
+============================
+
+Unfortunately this was broken release not including any important changes.
+
+
+Release 1.2.2 (Jul 2, 2014)
+===========================
+
+* Fixed issue with custom primary keys at admin extensions (Thanks Omer Katz)
+* ``get_403_or_None`` now accepts Python path to the view function, for example
+  ``'django.contrib.auth.views.login'`` (Thanks Warren Volz)
+* Added ``with_superuser`` flag to ``guardian.shortcuts.get_objects_for_user``
+  (Thanks Bruno Ribeiro da Silva)
+* Added possibility to disable monkey patching of the ``User`` model.
+  (Thanks Cezar Jenkins)
+
+
 Release 1.2 (Mar 7, 2014)
 =========================
 

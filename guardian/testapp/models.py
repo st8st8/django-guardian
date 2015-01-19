@@ -1,8 +1,21 @@
 from __future__ import unicode_literals
 from datetime import datetime
+
+import django
 from django.db import models
 from django.contrib.admin.models import LogEntry
-from guardian.models import UserObjectPermissionBase, GroupObjectPermissionBase
+
+from guardian.mixins import GuardianUserMixin
+from guardian.models import UserObjectPermissionBase
+from guardian.models import GroupObjectPermissionBase
+
+
+class DynamicAccessor(object):
+    def __init__(self):
+        pass
+
+    def __getattr__(self, key):
+        return DynamicAccessor()
 
 
 class DynamicAccessor(object):
@@ -34,6 +47,9 @@ class Project(models.Model):
 Project.not_a_relation_descriptor = DynamicAccessor()
 
 
+Project.not_a_relation_descriptor = DynamicAccessor()
+
+
 class MixedGroupObjectPermission(GroupObjectPermissionBase):
     content_object = models.ForeignKey('Mixed')
 
@@ -52,3 +68,16 @@ class Mixed(models.Model):
 class LogEntryWithGroup(LogEntry):
     group = models.ForeignKey('auth.Group', null=True, blank=True)
 
+
+class NonIntPKModel(models.Model):
+    """
+    Model for testing whether get_objects_for_user will work when the objects to
+    be returned have non-integer primary keys.
+    """
+    char_pk = models.CharField(primary_key=True, max_length=128)
+
+
+if django.VERSION > (1, 5):
+    from django.contrib.auth.models import AbstractUser
+    class CustomUser(AbstractUser, GuardianUserMixin):
+        custom_id = models.AutoField(primary_key=True)

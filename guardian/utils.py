@@ -27,6 +27,7 @@ from guardian.exceptions import NotUserNorGroup
 from datetime import datetime
 from django.utils.timezone import utc
 
+from django.contrib.auth.views import redirect_to_login
 
 logger = logging.getLogger(__name__)
 abspath = lambda *p: os.path.abspath(os.path.join(*p))
@@ -37,7 +38,7 @@ def get_anonymous_user():
     Returns ``User`` instance (not ``AnonymousUser``) depending on
     ``ANONYMOUS_USER_ID`` configuration.
     """
-    return get_user_model().objects.get(id=guardian_settings.ANONYMOUS_USER_ID)
+    return get_user_model().objects.get(pk=guardian_settings.ANONYMOUS_USER_ID)
 
 
 def get_identity(identity):
@@ -117,9 +118,9 @@ def get_403_or_None(request, perms, obj=None, login_url=None,
                 raise PermissionDenied
             return HttpResponseForbidden()
         else:
-            path = urlquote(request.get_full_path())
-            tup = login_url, redirect_field_name, path
-            return HttpResponseRedirect("%s?%s=%s" % tup)
+            return redirect_to_login(request.get_full_path(),
+                                     login_url,
+                                     redirect_field_name)
 
 
 def clean_orphan_obj_perms():
