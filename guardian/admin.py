@@ -191,56 +191,17 @@ class GuardedModelAdminMixin(object):
 
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
             user_form = UserManage(request.POST)
-            request.session["admin_perm_user"] = request.POST["user"]
-        else:
-            user_form = UserManage({"user": request.session.get("admin_perm_user")})
-
-        group_form = GroupManage()
-        organization_form = OrganizationManage()
-        info = (
-            self.admin_site.name,
-            self.model._meta.app_label,
-            self.model._meta.module_name
-        )
-        if request.method == 'POST' and 'submit_manage_user' in request.POST:
-            user_form = UserManage(request.POST)
-            request.session["admin_perm_user"] = request.POST["user"]
-        else:
-            user_form = UserManage({"user": request.session.get("admin_perm_user")})
-
-        group_form = GroupManage()
-        info = (
-            self.admin_site.name,
-            self.model._meta.app_label,
-            self.model._meta.module_name
-        )
-        if user_form.is_valid():
-            users = user_form.cleaned_data['user']
-            users_perms = SortedDict()
-            for user in users:
-                users_perms[user] = sorted(get_perms(user, obj))
-            users_perms.keyOrder.sort(key=lambda user: user.get_full_name())
-
-           # url = reverse(
-           #     '%s:%s_%s_permissions_manage_user' % info,
-           #     args=[obj.pk, user_id]
-           # )
-          # return redirect(url)
-
-        elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
-            user_form = UserManage()
             group_form = GroupManage()
-            organization_form = OrganizationManage(request.POST)
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
                 self.model._meta.module_name
             )
-            if organization_form.is_valid():
-                org_id = organization_form.cleaned_data['organization'].id
+            if user_form.is_valid():
+                user_id = user_form.cleaned_data['user'].pk
                 url = reverse(
-                    '%s:%s_%s_permissions_manage_organization' % info,
-                    args=[obj.pk, org_id]
+                    '%s:%s_%s_permissions_manage_user' % info,
+                    args=[obj.pk, user_id]
                 )
                 return redirect(url)
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
@@ -256,6 +217,22 @@ class GuardedModelAdminMixin(object):
                 url = reverse(
                     '%s:%s_%s_permissions_manage_group' % info,
                     args=[obj.pk, group_id]
+                )
+                return redirect(url)
+        elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
+            user_form = UserManage()
+            group_form = GroupManage()
+            organization_form = OrganizationManage(request.POST)
+            info = (
+                self.admin_site.name,
+                self.model._meta.app_label,
+                self.model._meta.module_name
+            )
+            if organization_form.is_valid():
+                org_id = organization_form.cleaned_data['organization'].id
+                url = reverse(
+                    '%s:%s_%s_permissions_manage_organization' % info,
+                    args=[obj.pk, org_id]
                 )
                 return redirect(url)
         else:
@@ -554,4 +531,21 @@ class GroupManage(forms.Form):
         except Group.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['group'].error_messages['does_not_exist'])
+
+
+class OrganizationManage(forms.Form):
+    organization = forms.CharField(max_length=80, error_messages={'does_not_exist':
+        _("This organization does not exist")})
+
+    def clean_organization(self):
+        """
+        Returns ``Group`` instance based on the given group name.
+        """
+        name = self.cleaned_data['organization']
+        try:
+            org = Organization.objects.get(name=name)
+            return org
+        except Organization.DoesNotExist:
+            raise forms.ValidationError(
+                self.fields['organization'].error_messages['does_not_exist'])
 

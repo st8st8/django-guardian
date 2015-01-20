@@ -99,7 +99,7 @@ class ObjectPermissionChecker(object):
             organization_rel_name = organization_model.permission.field.related_query_name()
             if permission_expiry:
                 kwargs1 = {"%s__permission_expiry"%organization_rel_name: None}
-                kwargs2 = {"%s__permission_expiry__lte"%organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
+                kwargs2 = {"%s__permission_expiry__gte"%organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
                 org_q = (Q(**kwargs1) | Q(**kwargs2),)
             if self.user:
                 fieldname = '%s__organization__%s' % (
