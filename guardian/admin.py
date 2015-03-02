@@ -192,21 +192,22 @@ class GuardedModelAdminMixin(object):
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
             user_form = UserManage(request.POST)
             group_form = GroupManage()
+            organization_form = OrganizationManage()
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
                 self.model._meta.module_name
             )
             if user_form.is_valid():
-                user_id = user_form.cleaned_data['user'].pk
-                url = reverse(
-                    '%s:%s_%s_permissions_manage_user' % info,
-                    args=[obj.pk, user_id]
-                )
-                return redirect(url)
+                users = user_form.cleaned_data['user']
+                users_perms = SortedDict()
+                for user in users:
+                    users_perms[user] = sorted(get_perms(user, obj))
+                users_perms.keyOrder.sort(key=lambda user: user.get_full_name())
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
             user_form = UserManage()
             group_form = GroupManage(request.POST)
+            organization_form = OrganizationManage()
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
@@ -497,20 +498,21 @@ class UserManage(forms.Form):
                         error_messages = {'does_not_exist': _("This user does not exist")},
                         help_text=_('Enter a value compatible with User.USERNAME_FIELD')
                      )
-
+    
     def clean_user(self):
         """
         Returns ``User`` instance based on the given identification.
         """
-        identification = self.cleaned_data['user']
+        s = self.cleaned_data['user']
         user_model = get_user_model()
         try:
             username_field = user_model.USERNAME_FIELD
         except AttributeError:
             username_field = 'username'
         try:
-            user = user_model.objects.get(**{username_field: identification})
-            return user
+            users = get_user_model().objects.filter(Q(username__icontains=s)| Q(first_name__icontains=s)|Q(last_name__icontains=s))[:20]
+            return users
+
         except user_model.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['user'].error_messages['does_not_exist'])
