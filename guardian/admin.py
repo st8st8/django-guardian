@@ -498,7 +498,7 @@ class UserManage(forms.Form):
                         error_messages = {'does_not_exist': _("This user does not exist")},
                         help_text=_('Enter a value compatible with User.USERNAME_FIELD')
                      )
-    
+
     def clean_user(self):
         """
         Returns ``User`` instance based on the given identification.
