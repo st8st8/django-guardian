@@ -1,18 +1,19 @@
 from __future__ import unicode_literals
 
+import warnings
+
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 
 from guardian.exceptions import ObjectNotPersisted
 from guardian.models import Permission
-import warnings
+
 
 # TODO: consolidate UserObjectPermissionManager and GroupObjectPermissionManager
 from guardian.utils import calculate_permission_expiry
 
 
 class BaseObjectPermissionManager(models.Manager):
-
     def is_generic(self):
         try:
             self.model._meta.get_field('object_pk')
@@ -22,7 +23,6 @@ class BaseObjectPermissionManager(models.Manager):
 
 
 class UserObjectPermissionManager(BaseObjectPermissionManager):
-
     def assign_perm(self, perm, user, obj, renewal_period=None):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
@@ -30,7 +30,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
         """
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         ctype = ContentType.objects.get_for_model(obj)
         permission = Permission.objects.get(content_type=ctype, codename=perm)
 
@@ -48,7 +48,9 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
 
     def assign(self, perm, user, obj):
         """ Depreciated function name left in for compatibility"""
-        warnings.warn("UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.", DeprecationWarning)
+        warnings.warn(
+            "UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.",
+            DeprecationWarning)
         return self.assign_perm(perm, user, obj)
 
     def remove_perm(self, perm, user, obj):
@@ -61,7 +63,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
         """
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         filters = {
             'permission__codename': perm,
             'permission__content_type': ContentType.objects.get_for_model(obj),
@@ -75,7 +77,6 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
 
 
 class GroupObjectPermissionManager(BaseObjectPermissionManager):
-
     def assign_perm(self, perm, group, obj, renewal_period=None):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
@@ -83,7 +84,7 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
         """
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         ctype = ContentType.objects.get_for_model(obj)
         permission = Permission.objects.get(content_type=ctype, codename=perm)
 
@@ -100,7 +101,9 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
 
     def assign(self, perm, user, obj):
         """ Depreciated function name left in for compatibility"""
-        warnings.warn("UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.", DeprecationWarning)
+        warnings.warn(
+            "UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.",
+            DeprecationWarning)
         return self.assign_perm(perm, user, obj)
 
     def remove_perm(self, perm, group, obj):
@@ -109,7 +112,7 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
         """
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         filters = {
             'permission__codename': perm,
             'permission__content_type': ContentType.objects.get_for_model(obj),
@@ -124,7 +127,6 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
 
 
 class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
-
     def assign_perm(self, perm, organization, obj, renewal_period=None):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
@@ -132,7 +134,7 @@ class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
         """
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         ctype = ContentType.objects.get_for_model(obj)
         permission = Permission.objects.get(content_type=ctype, codename=perm)
 
@@ -149,7 +151,9 @@ class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
 
     def assign(self, perm, user, obj):
         """ Depreciated function name left in for compatibility"""
-        warnings.warn("UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 1.0.5 version.", DeprecationWarning)
+        warnings.warn(
+            "UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 1.0.5 version.",
+            DeprecationWarning)
         return self.assign_perm(perm, user, obj)
 
     def remove_perm(self, perm, organization, obj):
@@ -158,7 +162,7 @@ class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
         """
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         filters = {
             'permission__codename': perm,
             'permission__content_type': ContentType.objects.get_for_model(obj),
@@ -174,11 +178,11 @@ class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
     def get_for_object(self, organization, obj):
         if getattr(obj, 'pk', None) is None:
             raise ObjectNotPersisted("Object %s needs to be persisted first"
-                % obj)
+                                     % obj)
         ctype = ContentType.objects.get_for_model(obj)
         perms = self.filter(
-            content_type = ctype,
-            organization = organization,
+            content_type=ctype,
+            organization=organization,
         )
         return perms
 

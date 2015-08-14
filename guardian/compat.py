@@ -1,17 +1,19 @@
 from __future__ import unicode_literals
 
+import six
+import sys
+
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.auth.models import AnonymousUser
 from django.utils.importlib import import_module
-import six
-import sys
+
 
 try:
     from django.conf.urls import url, patterns, include, handler404, handler500
 except ImportError:
-    from django.conf.urls.defaults import url, patterns, include, handler404, handler500 # pyflakes:ignore
+    from django.conf.urls.defaults import url, patterns, include, handler404, handler500  # pyflakes:ignore
 
 __all__ = [
     'User',
@@ -38,7 +40,7 @@ try:
     from unittest import mock  # Since Python 3.3 mock is is in stdlib
 except ImportError:
     try:
-        import mock # pyflakes:ignore
+        import mock  # pyflakes:ignore
     except ImportError:
         # mock is used for tests only however it is hard to check if user is
         # running tests or production code so we fail silently here; mock is
@@ -56,7 +58,9 @@ try:
     from django.contrib.auth import get_user_model
 except ImportError:
     from django.contrib.auth.models import User
+
     get_user_model = lambda: User
+
 
 def get_user_model_path():
     """
@@ -66,6 +70,7 @@ def get_user_model_path():
     """
     return getattr(settings, 'AUTH_USER_MODEL', 'auth.User')
 
+
 def get_user_permission_full_codename(perm):
     """
     Returns 'app_label.<perm>_<usermodulename>'. If standard ``auth.User`` is
@@ -74,6 +79,7 @@ def get_user_permission_full_codename(perm):
     """
     User = get_user_model()
     return '%s.%s_%s' % (User._meta.app_label, perm, User._meta.module_name)
+
 
 def get_user_permission_codename(perm):
     """
@@ -109,9 +115,9 @@ def import_string(dotted_path):
 
 # Python 3
 try:
-    unicode = unicode # pyflakes:ignore
-    basestring = basestring # pyflakes:ignore
-    str = str # pyflakes:ignore
+    unicode = unicode  # pyflakes:ignore
+    basestring = basestring  # pyflakes:ignore
+    str = str  # pyflakes:ignore
 except NameError:
     basestring = unicode = str = str
 
@@ -123,9 +129,10 @@ def create_permissions(*args, **kwargs):
     from django.contrib.auth.management import create_permissions as original_create_permissions
     import django
 
-    if django.get_version().split('.')[:2] >= ['1','7'] and \
-        len(args) > 1 and isinstance(args[1], (list, tuple)):
+    if django.get_version().split('.')[:2] >= ['1', '7'] and \
+                    len(args) > 1 and isinstance(args[1], (list, tuple)):
         args = args[:1] + args[2:]
     return original_create_permissions(*args, **kwargs)
+
 
 __all__ = ['User', 'Group', 'Permission', 'AnonymousUser']

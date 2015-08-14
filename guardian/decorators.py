@@ -7,6 +7,7 @@ from django.db.models import Model, get_model
 from django.db.models.base import ModelBase
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
+
 from guardian.compat import basestring
 from guardian.exceptions import GuardianError
 from guardian.utils import get_403_or_None
@@ -78,7 +79,7 @@ def permission_required(perm, lookup_variables=None, **kwargs):
     # view function itself which makes debugging harder
     if not isinstance(perm, basestring):
         raise GuardianError("First argument must be in format: "
-            "'app_label.codename or a callable which return similar string'")
+                            "'app_label.codename or a callable which return similar string'")
 
     def decorator(view_func):
         def _wrapped_view(request, *args, **kwargs):
@@ -92,33 +93,35 @@ def permission_required(perm, lookup_variables=None, **kwargs):
                     splitted = model.split('.')
                     if len(splitted) != 2:
                         raise GuardianError("If model should be looked up from "
-                            "string it needs format: 'app_label.ModelClass'")
+                                            "string it needs format: 'app_label.ModelClass'")
                     model = get_model(*splitted)
                 elif issubclass(model.__class__, (Model, ModelBase, QuerySet)):
                     pass
                 else:
                     raise GuardianError("First lookup argument must always be "
-                        "a model, string pointing at app/model or queryset. "
-                        "Given: %s (type: %s)" % (model, type(model)))
+                                        "a model, string pointing at app/model or queryset. "
+                                        "Given: %s (type: %s)" % (model, type(model)))
                 # Parse lookups
                 if len(lookups) % 2 != 0:
                     raise GuardianError("Lookup variables must be provided "
-                        "as pairs of lookup_string and view_arg")
+                                        "as pairs of lookup_string and view_arg")
                 lookup_dict = {}
                 for lookup, view_arg in zip(lookups[::2], lookups[1::2]):
                     if view_arg not in kwargs:
                         raise GuardianError("Argument %s was not passed "
-                            "into view function" % view_arg)
+                                            "into view function" % view_arg)
                     lookup_dict[lookup] = kwargs[view_arg]
                 obj = get_object_or_404(model, **lookup_dict)
 
             response = get_403_or_None(request, perms=[perm], obj=obj,
-                login_url=login_url, redirect_field_name=redirect_field_name,
-                return_403=return_403, accept_global_perms=accept_global_perms)
+                                       login_url=login_url, redirect_field_name=redirect_field_name,
+                                       return_403=return_403, accept_global_perms=accept_global_perms)
             if response:
                 return response
             return view_func(request, *args, **kwargs)
+
         return wraps(view_func)(_wrapped_view)
+
     return decorator
 
 

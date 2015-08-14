@@ -2,10 +2,7 @@ from __future__ import unicode_literals
 
 from django import forms
 from django.conf import settings
-from django.contrib.admin import ModelAdmin
 from django.db.models import Q
-from organizations.models import Organization
-from guardian.compat import url, patterns
 from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
@@ -15,14 +12,15 @@ from django.template import RequestContext
 from django.utils.datastructures import SortedDict
 from django.utils.translation import ugettext, ugettext_lazy as _
 
+from organizations.models import Organization
+from guardian.compat import url, patterns
 from guardian.compat import get_user_model
 from guardian.forms import UserObjectPermissionsForm, OrganizationObjectPermissionsForm
 from guardian.forms import GroupObjectPermissionsForm
 from guardian.shortcuts import get_perms, get_organizations_with_perms
-from guardian.shortcuts import get_users_with_perms
 from guardian.shortcuts import get_groups_with_perms
 from guardian.shortcuts import get_perms_for_model
-from guardian.models import Group, UserObjectPermission
+from guardian.models import Group
 from organizations.managers import OrgManager
 
 
@@ -32,6 +30,7 @@ class AdminUserObjectPermissionsForm(UserObjectPermissionsForm):
     ``get_obj_perms_field_widget`` method so it return
     ``django.contrib.admin.widgets.FilteredSelectMultiple`` widget.
     """
+
     def get_obj_perms_field_widget(self):
         return FilteredSelectMultiple(_("Permissions"), False)
 
@@ -42,8 +41,10 @@ class AdminGroupObjectPermissionsForm(GroupObjectPermissionsForm):
     ``get_obj_perms_field_widget`` method so it return
     ``django.contrib.admin.widgets.FilteredSelectMultiple`` widget.
     """
+
     def get_obj_perms_field_widget(self):
         return FilteredSelectMultiple(_("Permissions"), False)
+
 
 class AdminOrganizationObjectPermissionsForm(OrganizationObjectPermissionsForm):
     """
@@ -51,8 +52,10 @@ class AdminOrganizationObjectPermissionsForm(OrganizationObjectPermissionsForm):
     ``get_obj_perms_field_widget`` method so it return
     ``django.contrib.admin.widgets.FilteredSelectMultiple`` widget.
     """
+
     def get_obj_perms_field_widget(self):
         return FilteredSelectMultiple(_("Permissions"), False)
+
 
 class GuardedModelAdminMixin(object):
     """
@@ -107,6 +110,7 @@ class GuardedModelAdminMixin(object):
     # for versions >= 1.6 this is taken care of by Django itself
     # and triggers a warning message automatically.
     import django
+
     if django.VERSION < (1, 6):
         queryset = get_queryset
 
@@ -128,22 +132,22 @@ class GuardedModelAdminMixin(object):
         if self.include_object_permissions_urls:
             info = self.model._meta.app_label, self.model._meta.module_name
             myurls = patterns('',
-                url(r'^(?P<object_pk>.+)/permissions/$',
-                    view=self.admin_site.admin_view(self.obj_perms_manage_view),
-                    name='%s_%s_permissions' % info),
-                url(r'^(?P<object_pk>.+)/permissions/user-manage/(?P<user_id>\-?\d+)/$',
-                    view=self.admin_site.admin_view(
-                        self.obj_perms_manage_user_view),
-                    name='%s_%s_permissions_manage_user' % info),
-                url(r'^(?P<object_pk>.+)/permissions/group-manage/(?P<group_id>\-?\d+)/$',
-                    view=self.admin_site.admin_view(
-                        self.obj_perms_manage_group_view),
-                    name='%s_%s_permissions_manage_group' % info),
-		        url(r'^(?P<object_pk>.+)/permissions/organization-manage/(?P<organization_id>\-?\d+)/$',
-		            view=self.admin_site.admin_view(
-		                self.obj_perms_manage_organization_view),
-		            name='%s_%s_permissions_manage_organization' % info),
-            )
+                              url(r'^(?P<object_pk>.+)/permissions/$',
+                                  view=self.admin_site.admin_view(self.obj_perms_manage_view),
+                                  name='%s_%s_permissions' % info),
+                              url(r'^(?P<object_pk>.+)/permissions/user-manage/(?P<user_id>\-?\d+)/$',
+                                  view=self.admin_site.admin_view(
+                                      self.obj_perms_manage_user_view),
+                                  name='%s_%s_permissions_manage_user' % info),
+                              url(r'^(?P<object_pk>.+)/permissions/group-manage/(?P<group_id>\-?\d+)/$',
+                                  view=self.admin_site.admin_view(
+                                      self.obj_perms_manage_group_view),
+                                  name='%s_%s_permissions_manage_group' % info),
+                              url(r'^(?P<object_pk>.+)/permissions/organization-manage/(?P<organization_id>\-?\d+)/$',
+                                  view=self.admin_site.admin_view(
+                                      self.obj_perms_manage_organization_view),
+                                  name='%s_%s_permissions_manage_organization' % info),
+                              )
             urls = myurls + urls
         return urls
 
@@ -158,8 +162,8 @@ class GuardedModelAdminMixin(object):
             'object': obj,
             'app_label': self.model._meta.app_label,
             'opts': self.model._meta,
-            'original': hasattr(obj, '__unicode__') and obj.__unicode__() or\
-                str(obj),
+            'original': hasattr(obj, '__unicode__') and obj.__unicode__() or \
+                        str(obj),
             'has_change_permission': self.has_change_permission(request, obj),
             'model_perms': get_perms_for_model(obj),
             'title': _("Object permissions"),
@@ -175,8 +179,8 @@ class GuardedModelAdminMixin(object):
         forms presented within the page.
         """
         obj = get_object_or_404(self.queryset(request), pk=object_pk)
-        #users_perms = SortedDict(
-        #    get_users_with_perms(obj, attach_perms=True,
+        # users_perms = SortedDict(
+        # get_users_with_perms(obj, attach_perms=True,
         #        with_group_users=False))
 
         #users_perms.keyOrder.sort(key=lambda user:
@@ -494,10 +498,10 @@ class GuardedModelAdmin(GuardedModelAdminMixin, admin.ModelAdmin):
 
 class UserManage(forms.Form):
     user = forms.CharField(label=_("User identification"),
-                        max_length=200,
-                        error_messages = {'does_not_exist': _("This user does not exist")},
-                        help_text=_('Enter a value compatible with User.USERNAME_FIELD')
-                     )
+                           max_length=200,
+                           error_messages={'does_not_exist': _("This user does not exist")},
+                           help_text=_('Enter a value compatible with User.USERNAME_FIELD')
+                           )
 
     def clean_user(self):
         """
@@ -510,7 +514,8 @@ class UserManage(forms.Form):
         except AttributeError:
             username_field = 'username'
         try:
-            users = get_user_model().objects.filter(Q(username__icontains=s)| Q(first_name__icontains=s)|Q(last_name__icontains=s))[:20]
+            users = get_user_model().objects.filter(
+                Q(username__icontains=s) | Q(first_name__icontains=s) | Q(last_name__icontains=s))[:20]
             return users
 
         except user_model.DoesNotExist:
@@ -520,7 +525,7 @@ class UserManage(forms.Form):
 
 class GroupManage(forms.Form):
     group = forms.CharField(max_length=80, error_messages={'does_not_exist':
-        _("This group does not exist")})
+                                                               _("This group does not exist")})
 
     def clean_group(self):
         """
@@ -537,7 +542,7 @@ class GroupManage(forms.Form):
 
 class OrganizationManage(forms.Form):
     organization = forms.CharField(max_length=80, error_messages={'does_not_exist':
-        _("This organization does not exist")})
+                                                                      _("This organization does not exist")})
 
     def clean_organization(self):
         """

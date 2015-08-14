@@ -7,12 +7,10 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.generic import GenericForeignKey
 from django.utils.translation import ugettext_lazy as _
-from organizations.models import Organization
 
-from guardian.compat import get_user_model
+from organizations.models import Organization
 from guardian.compat import user_model_label
 from guardian.compat import unicode
-from guardian.utils import get_anonymous_user
 from guardian.managers import GroupObjectPermissionManager, OrganizationObjectPermissionManager
 from guardian.managers import UserObjectPermissionManager
 
@@ -37,8 +35,8 @@ class BaseObjectPermission(models.Model):
         content_type = ContentType.objects.get_for_model(self.content_object)
         if content_type != self.permission.content_type:
             raise ValidationError("Cannot persist permission not designed for "
-                "this class (permission's type is %r and object's type is %r)"
-                % (self.permission.content_type, content_type))
+                                  "this class (permission's type is %r and object's type is %r)"
+                                  % (self.permission.content_type, content_type))
         return super(BaseObjectPermission, self).save(*args, **kwargs)
 
 
@@ -109,16 +107,18 @@ class OrganizationObjectPermission(OrganizationObjectPermissionBase, BaseGeneric
 # As with Django 1.7, you can't use the get_user_model at this point
 # because the app registry isn't ready yet (we're inside a model file).
 import django
+
 if django.VERSION < (1, 7) and settings.MONKEY_PATCH:
     from . import monkey_patch_user
+
     monkey_patch_user()
 
 setattr(Group, 'add_obj_perm',
-    lambda self, perm, obj: GroupObjectPermission.objects.assign_perm(perm, self, obj))
+        lambda self, perm, obj: GroupObjectPermission.objects.assign_perm(perm, self, obj))
 setattr(Group, 'del_obj_perm',
-    lambda self, perm, obj: GroupObjectPermission.objects.remove_perm(perm, self, obj))
+        lambda self, perm, obj: GroupObjectPermission.objects.remove_perm(perm, self, obj))
 
 setattr(Organization, 'add_obj_perm',
-    lambda self, perm, obj: OrganizationObjectPermission.objects.assign_perm(perm, self, obj))
+        lambda self, perm, obj: OrganizationObjectPermission.objects.assign_perm(perm, self, obj))
 setattr(Organization, 'del_obj_perm',
-    lambda self, perm, obj: OrganizationObjectPermission.objects.remove_perm(perm, self, obj))
+        lambda self, perm, obj: OrganizationObjectPermission.objects.remove_perm(perm, self, obj))

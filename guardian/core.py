@@ -6,12 +6,13 @@ from datetime import datetime
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
+from django.utils.timezone import utc
 
 from guardian.utils import get_identity, get_organization_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
 from guardian.compat import get_user_model
-from django.utils.timezone import utc
+
 
 class ObjectPermissionChecker(object):
     """
@@ -31,6 +32,7 @@ class ObjectPermissionChecker(object):
        difference as permissions are already fetched and stored within cache
        dictionary.
     """
+
     def __init__(self, user_or_group=None):
         """
         :param user_or_group: should be an ``User``, ``AnonymousUser`` or
@@ -71,12 +73,12 @@ class ObjectPermissionChecker(object):
         group_q = ()
         org_q = ()
         if True:  # not key in self._obj_perms_cache:
-            #Django groups
+            # Django groups
             group_model = get_group_obj_perms_model(obj)
             group_rel_name = group_model.permission.field.related_query_name()
             if permission_expiry:
-                kwargs1 = {"%s__permission_expiry"%group_rel_name: None}
-                kwargs2 = {"%s__permission_expiry__lte"%group_rel_name: datetime.utcnow().replace(tzinfo=utc)}
+                kwargs1 = {"%s__permission_expiry" % group_rel_name: None}
+                kwargs2 = {"%s__permission_expiry__lte" % group_rel_name: datetime.utcnow().replace(tzinfo=utc)}
                 group_q = (Q(**kwargs1) | Q(**kwargs2),)
             if self.user:
                 fieldname = '%s__group__%s' % (
@@ -94,12 +96,12 @@ class ObjectPermissionChecker(object):
             else:
                 group_filters['%s__content_object' % group_rel_name] = obj
 
-            #Django organizations
+            # Django organizations
             organization_model = get_organization_obj_perms_model(obj)
             organization_rel_name = organization_model.permission.field.related_query_name()
             if permission_expiry:
-                kwargs1 = {"%s__permission_expiry"%organization_rel_name: None}
-                kwargs2 = {"%s__permission_expiry__gte"%organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
+                kwargs1 = {"%s__permission_expiry" % organization_rel_name: None}
+                kwargs2 = {"%s__permission_expiry__gte" % organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
                 org_q = (Q(**kwargs1) | Q(**kwargs2),)
             if self.user:
                 fieldname = '%s__organization__%s' % (
@@ -121,8 +123,8 @@ class ObjectPermissionChecker(object):
                 return []
             elif self.user and self.user.is_superuser:
                 perms = list(chain(*Permission.objects
-                    .filter(content_type=ctype)
-                    .values_list("codename")))
+                                   .filter(content_type=ctype)
+                                   .values_list("codename")))
             elif self.user:
                 model = get_user_obj_perms_model(obj)
                 related_name = model.permission.field.related_query_name()
@@ -137,8 +139,8 @@ class ObjectPermissionChecker(object):
                 perms_qs = Permission.objects.filter(content_type=ctype)
                 user_q = ()
                 if permission_expiry:
-                    kwargs1 = {"%s__permission_expiry"%related_name: None}
-                    kwargs2 = {"%s__permission_expiry__gte"%related_name: datetime.utcnow().replace(tzinfo=utc)}
+                    kwargs1 = {"%s__permission_expiry" % related_name: None}
+                    kwargs2 = {"%s__permission_expiry__gte" % related_name: datetime.utcnow().replace(tzinfo=utc)}
                     user_q = (Q(**kwargs1) | Q(**kwargs2),)
                 # Query user and group permissions separately and then combine
                 # the results to avoid a slow query
@@ -151,14 +153,14 @@ class ObjectPermissionChecker(object):
                 perms = list(set(chain(user_perms, group_perms, organization_perms)))
             elif self.group:
                 perms = list(set(chain(*Permission.objects
-                    .filter(content_type=ctype)
-                    .filter(*group_q, **group_filters)
-                    .values_list("codename"))))
+                                       .filter(content_type=ctype)
+                                       .filter(*group_q, **group_filters)
+                                       .values_list("codename"))))
             elif self.organization:
                 perms = list(set(chain(*Permission.objects
-                    .filter(content_type=ctype)
-                    .filter(*org_q, **organization_filters)
-                    .values_list("codename"))))
+                                       .filter(content_type=ctype)
+                                       .filter(*org_q, **organization_filters)
+                                       .values_list("codename"))))
             self._obj_perms_cache[key] = perms
         return self._obj_perms_cache[key]
 
