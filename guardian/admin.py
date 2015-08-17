@@ -8,7 +8,7 @@ from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.urlresolvers import reverse
-from django.shortcuts import render_to_response, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect
 from django.template import RequestContext
 from django.utils.datastructures import SortedDict
 from django.utils.translation import ugettext, ugettext_lazy as _
@@ -254,7 +254,7 @@ class GuardedModelAdminMixin(object):
         context['group_form'] = group_form
         context['organization_form'] = organization_form
 
-        return render_to_response(self.get_obj_perms_manage_template(),
+        return render(self.get_obj_perms_manage_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
     def get_obj_perms_manage_template(self):
@@ -300,7 +300,7 @@ class GuardedModelAdminMixin(object):
         context['user_perms'] = get_perms(user, obj)
         context['form'] = form
 
-        return render_to_response(self.get_obj_perms_manage_user_template(),
+        return render(self.get_obj_perms_manage_user_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
     def get_obj_perms_manage_user_template(self):
@@ -353,7 +353,7 @@ class GuardedModelAdminMixin(object):
         context['group_perms'] = get_perms(group, obj)
         context['form'] = form
 
-        return render_to_response(self.get_obj_perms_manage_group_template(),
+        return render(self.get_obj_perms_manage_group_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
     def get_obj_perms_manage_group_template(self):
@@ -486,7 +486,7 @@ class GuardedModelAdmin(GuardedModelAdminMixin, admin.ModelAdmin):
         context['organization_perms'] = get_perms(organization, obj)
         context['form'] = form
 
-        return render_to_response(self.get_obj_perms_manage_organization_template(),
+        return render(self.get_obj_perms_manage_organization_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
 

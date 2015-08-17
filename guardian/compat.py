@@ -144,6 +144,7 @@ def get_model_name(model):
     """
     Returns the name of the model
     """
+    import django
     # model._meta.module_name is deprecated in django version 1.7 and removed in django version 1.8.
     # It is replaced by model._meta.model_name
     if django.VERSION < (1, 7):

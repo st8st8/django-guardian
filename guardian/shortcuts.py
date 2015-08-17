@@ -332,7 +332,7 @@ def get_organizations_with_perms(obj, attach_perms=False):
 
 
 def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=False,
-        with_superuser=True, accept_global_perms=True):
+        with_superuser=True, accept_global_perms=False):
     """
     Returns queryset of objects for which a given ``user`` has *all*
     permissions present at ``perms``.

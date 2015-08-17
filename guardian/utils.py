@@ -16,7 +16,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.db.models import Model
 from django.http import HttpResponseForbidden, HttpResponseRedirect
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.template import RequestContext, TemplateDoesNotExist
 from django.utils.http import urlquote
 from organizations.models import Organization
@@ -106,7 +106,7 @@ def get_403_or_None(request, perms, obj=None, login_url=None,
         if return_403:
             if guardian_settings.RENDER_403:
                 try:
-                    response = render_to_response(
+                    response = render(
                         guardian_settings.TEMPLATE_403, {},
                         RequestContext(request))
                     response.status_code = 403
