@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 """
 ``django-guardian`` template tags. To use in a template just put the following
 *load* tag inside a template::

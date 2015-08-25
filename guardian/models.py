@@ -1,4 +1,9 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+from builtins import str
+from builtins import object
 
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -15,7 +20,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from organizations.models import Organization
 from guardian.compat import user_model_label
-from guardian.compat import unicode
+from guardian.compat import str
 from guardian.managers import GroupObjectPermissionManager, OrganizationObjectPermissionManager
 from guardian.managers import UserObjectPermissionManager
 
@@ -27,14 +32,14 @@ class BaseObjectPermission(models.Model):
     """
     permission = models.ForeignKey(Permission)
 
-    class Meta:
+    class Meta(object):
         abstract = True
 
     def __unicode__(self):
         return u'%s | %s | %s' % (
-            unicode(self.content_object),
-            unicode(getattr(self, 'user', False) or self.group),
-            unicode(self.permission.codename))
+            str(self.content_object),
+            str(getattr(self, 'user', False) or getattr(self, 'user', False) or self.organization),
+            str(self.permission.codename))
 
     def save(self, *args, **kwargs):
         content_type = ContentType.objects.get_for_model(self.content_object)
@@ -51,7 +56,7 @@ class BaseGenericObjectPermission(models.Model):
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True)
 
-    class Meta:
+    class Meta(object):
         abstract = True
 
 
@@ -63,13 +68,13 @@ class UserObjectPermissionBase(BaseObjectPermission):
 
     objects = UserObjectPermissionManager()
 
-    class Meta:
+    class Meta(object):
         abstract = True
         unique_together = ['user', 'permission', 'content_object']
 
 
 class UserObjectPermission(UserObjectPermissionBase, BaseGenericObjectPermission):
-    class Meta:
+    class Meta(object):
         unique_together = ['user', 'permission', 'object_pk']
 
 
@@ -81,13 +86,13 @@ class GroupObjectPermissionBase(BaseObjectPermission):
 
     objects = GroupObjectPermissionManager()
 
-    class Meta:
+    class Meta(object):
         abstract = True
         unique_together = ['group', 'permission', 'content_object']
 
 
 class GroupObjectPermission(GroupObjectPermissionBase, BaseGenericObjectPermission):
-    class Meta:
+    class Meta(object):
         unique_together = ['group', 'permission', 'object_pk']
 
 
@@ -99,13 +104,13 @@ class OrganizationObjectPermissionBase(BaseObjectPermission):
 
     objects = OrganizationObjectPermissionManager()
 
-    class Meta:
+    class Meta(object):
         abstract = True
         unique_together = ['organization', 'permission', 'content_object']
 
 
 class OrganizationObjectPermission(OrganizationObjectPermissionBase, BaseGenericObjectPermission):
-    class Meta:
+    class Meta(object):
         unique_together = ['organization', 'permission', 'object_pk']
 
 

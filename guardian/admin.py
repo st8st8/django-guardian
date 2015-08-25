@@ -1,6 +1,10 @@
-from __future__ import unicode_literals
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-import django
+from __future__ import unicode_literals
+from collections import OrderedDict
+from builtins import str
+from builtins import object
 from django import forms
 from django.conf import settings
 from django.db.models import Q
@@ -8,9 +12,8 @@ from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.urlresolvers import reverse
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import  get_object_or_404, redirect, render_to_response
 from django.template import RequestContext
-from django.utils.datastructures import SortedDict
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from organizations.models import Organization
@@ -179,7 +182,7 @@ class GuardedModelAdminMixin(object):
         shown. In order to add or manage user or group one should use links or
         forms presented within the page.
         """
-        obj = get_object_or_404(self.queryset(request), pk=object_pk)
+        obj = get_object_or_404(self.get_queryset(request), pk=object_pk)
         # users_perms = SortedDict(
         # get_users_with_perms(obj, attach_perms=True,
         #        with_group_users=False))
@@ -187,12 +190,12 @@ class GuardedModelAdminMixin(object):
         #users_perms.keyOrder.sort(key=lambda user:
         #                          getattr(user, get_user_model().USERNAME_FIELD))
         users_perms = None
-        groups_perms = SortedDict(
+        groups_perms = OrderedDict(
             get_groups_with_perms(obj, attach_perms=True))
-        groups_perms.keyOrder.sort(key=lambda group: group.name)
-        organization_perms = SortedDict(
+        groups_perms.keys().sort(key=lambda group: group.name)
+        organization_perms = OrderedDict(
             get_organizations_with_perms(obj, attach_perms=True))
-        organization_perms.keyOrder.sort(key=lambda group: group.name)
+        organization_perms.keys().sort(key=lambda group: group.name)
 
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
             user_form = UserManage(request.POST)
@@ -205,10 +208,10 @@ class GuardedModelAdminMixin(object):
             )
             if user_form.is_valid():
                 users = user_form.cleaned_data['user']
-                users_perms = SortedDict()
+                users_perms = OrderedDict()
                 for user in users:
                     users_perms[user] = sorted(get_perms(user, obj))
-                users_perms.keyOrder.sort(key=lambda user: user.get_full_name())
+                users_perms.keys().sort(key=lambda user: user.get_full_name())
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
             user_form = UserManage()
             group_form = GroupManage(request.POST)
@@ -254,7 +257,7 @@ class GuardedModelAdminMixin(object):
         context['group_form'] = group_form
         context['organization_form'] = organization_form
 
-        return render(self.get_obj_perms_manage_template(),
+        return render_to_response(self.get_obj_perms_manage_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
     def get_obj_perms_manage_template(self):
@@ -276,7 +279,7 @@ class GuardedModelAdminMixin(object):
         Manages selected users' permissions for current object.
         """
         user = get_object_or_404(get_user_model(), pk=user_id)
-        obj = get_object_or_404(self.queryset(request), pk=object_pk)
+        obj = get_object_or_404(self.get_queryset(request), pk=object_pk)
         form_class = self.get_obj_perms_manage_user_form()
         form = form_class(user, obj, request.POST or None)
 
@@ -300,7 +303,7 @@ class GuardedModelAdminMixin(object):
         context['user_perms'] = get_perms(user, obj)
         context['form'] = form
 
-        return render(self.get_obj_perms_manage_user_template(),
+        return render_to_response(self.get_obj_perms_manage_user_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
     def get_obj_perms_manage_user_template(self):
@@ -329,7 +332,7 @@ class GuardedModelAdminMixin(object):
         Manages selected groups' permissions for current object.
         """
         group = get_object_or_404(Group, id=group_id)
-        obj = get_object_or_404(self.queryset(request), pk=object_pk)
+        obj = get_object_or_404(self.get_queryset(request), pk=object_pk)
         form_class = self.get_obj_perms_manage_group_form()
         form = form_class(group, obj, request.POST or None)
 
@@ -353,7 +356,7 @@ class GuardedModelAdminMixin(object):
         context['group_perms'] = get_perms(group, obj)
         context['form'] = form
 
-        return render(self.get_obj_perms_manage_group_template(),
+        return render_to_response(self.get_obj_perms_manage_group_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
 
     def get_obj_perms_manage_group_template(self):
@@ -462,7 +465,7 @@ class GuardedModelAdmin(GuardedModelAdminMixin, admin.ModelAdmin):
         Manages selected organization' permissions for current object.
         """
         organization = get_object_or_404(Organization, id=organization_id)
-        obj = get_object_or_404(self.queryset(request), pk=object_pk)
+        obj = get_object_or_404(self.get_queryset(request), pk=object_pk)
         form_class = self.get_obj_perms_manage_organization_form()
         form = form_class(organization, obj, request.POST or None)
 
@@ -486,9 +489,8 @@ class GuardedModelAdmin(GuardedModelAdminMixin, admin.ModelAdmin):
         context['organization_perms'] = get_perms(organization, obj)
         context['form'] = form
 
-        return render(self.get_obj_perms_manage_organization_template(),
+        return render_to_response(self.get_obj_perms_manage_organization_template(),
             context, RequestContext(request, current_app=self.admin_site.name))
-
 
     def get_obj_perms_manage_organization_template(self):
         return self.obj_perms_manage_organization_template

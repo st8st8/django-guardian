@@ -1,10 +1,15 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+
+from django.contrib.auth.models import Group, Permission
+from django.test import TestCase
+
 from guardian.testapp.models import Mixed
 from guardian.testapp.models import Project
 from guardian.testapp.models import ProjectGroupObjectPermission
 from guardian.testapp.models import ProjectUserObjectPermission
-from django.contrib.auth.models import Group, Permission
-from django.test import TestCase
 from guardian.compat import get_user_model
 from guardian.shortcuts import assign_perm
 from guardian.shortcuts import get_groups_with_perms
@@ -20,7 +25,6 @@ User = get_user_model()
 
 @skipUnlessTestApp
 class TestDirectUserPermissions(TestCase):
-
     def setUp(self):
         self.joe = User.objects.create_user('joe', 'joe@example.com', 'foobar')
         self.project = Project.objects.create(name='Foobar')
@@ -72,10 +76,10 @@ class TestDirectUserPermissions(TestCase):
         assign_perm('change_project', self.joe, self.project)
         assign_perm('change_project', jane, self.project)
         self.assertEqual(get_users_with_perms(self.project, attach_perms=True),
-            {
-                self.joe: ['add_project', 'change_project'],
-                jane: ['change_project'],
-            })
+                         {
+                             self.joe: ['add_project', 'change_project'],
+                             jane: ['change_project'],
+                         })
 
     def test_get_users_with_perms_plus_groups(self):
         User.objects.create_user('john', 'john@foobar.com', 'john')
@@ -86,10 +90,10 @@ class TestDirectUserPermissions(TestCase):
         assign_perm('change_project', group, self.project)
         assign_perm('change_project', jane, self.project)
         self.assertEqual(get_users_with_perms(self.project, attach_perms=True),
-            {
-                self.joe: ['add_project', 'change_project'],
-                jane: ['change_project'],
-            })
+                         {
+                             self.joe: ['add_project', 'change_project'],
+                             jane: ['change_project'],
+                         })
 
     def test_get_objects_for_user(self):
         foo = Project.objects.create(name='foo')
@@ -120,7 +124,6 @@ class TestDirectUserPermissions(TestCase):
 
 @skipUnlessTestApp
 class TestDirectGroupPermissions(TestCase):
-
     def setUp(self):
         self.joe = User.objects.create_user('joe', 'joe@example.com', 'foobar')
         self.group = Group.objects.create(name='admins')
@@ -174,10 +177,10 @@ class TestDirectGroupPermissions(TestCase):
         assign_perm('change_project', self.group, self.project)
         assign_perm('change_project', devs, self.project)
         self.assertEqual(get_groups_with_perms(self.project, attach_perms=True),
-            {
-                self.group: ['add_project', 'change_project'],
-                devs: ['change_project'],
-            })
+                         {
+                             self.group: ['add_project', 'change_project'],
+                             devs: ['change_project'],
+                         })
 
     def test_get_objects_for_group(self):
         foo = Project.objects.create(name='foo')
@@ -192,7 +195,6 @@ class TestDirectGroupPermissions(TestCase):
 
 @skipUnlessTestApp
 class TestMixedDirectAndGenericObjectPermission(TestCase):
-
     def setUp(self):
         self.joe = User.objects.create_user('joe', 'joe@example.com', 'foobar')
         self.group = Group.objects.create(name='admins')
@@ -208,8 +210,8 @@ class TestMixedDirectAndGenericObjectPermission(TestCase):
         assign_perm('change_mixed', group, self.mixed)
         assign_perm('change_mixed', jane, self.mixed)
         self.assertEqual(get_users_with_perms(self.mixed, attach_perms=True),
-            {
-                self.joe: ['add_mixed', 'change_mixed'],
-                jane: ['change_mixed'],
-            })
+                         {
+                             self.joe: ['add_mixed', 'change_mixed'],
+                             jane: ['change_mixed'],
+                         })
 

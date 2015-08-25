@@ -1,4 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+
 from django.conf import settings
 from django.contrib.auth.models import Group, AnonymousUser
 from django.contrib.contenttypes.models import ContentType
@@ -9,7 +13,9 @@ from guardian.compat import get_user_model
 from guardian.exceptions import NotUserNorGroup
 from guardian.models import UserObjectPermission, GroupObjectPermission
 
+
 User = get_user_model()
+
 
 def render(template, context):
     """
@@ -19,27 +25,27 @@ def render(template, context):
     t = Template(template)
     return t.render(Context(context))
 
-class GetObjPermsTagTest(TestCase):
 
+class GetObjPermsTagTest(TestCase):
     def setUp(self):
         self.ctype = ContentType.objects.create(name='foo', model='bar',
-            app_label='fake-for-guardian-tests')
+                                                app_label='fake-for-guardian-tests')
         self.group = Group.objects.create(name='jackGroup')
         self.user = User.objects.create(username='jack')
         self.user.groups.add(self.group)
 
     def test_wrong_formats(self):
         wrong_formats = (
-            '{% get_obj_perms user for contenttype as obj_perms %}', # no quotes
-            '{% get_obj_perms user for contenttype as \'obj_perms" %}', # wrong quotes
-            '{% get_obj_perms user for contenttype as \'obj_perms" %}', # wrong quotes
-            '{% get_obj_perms user for contenttype as obj_perms" %}', # wrong quotes
-            '{% get_obj_perms user for contenttype as obj_perms\' %}', # wrong quotes
-            '{% get_obj_perms user for contenttype as %}', # no context_var
-            '{% get_obj_perms for contenttype as "obj_perms" %}', # no user/group
-            '{% get_obj_perms user contenttype as "obj_perms" %}', # no "for" bit
-            '{% get_obj_perms user for contenttype "obj_perms" %}', # no "as" bit
-            '{% get_obj_perms user for as "obj_perms" %}', # no object
+            '{% get_obj_perms user for contenttype as obj_perms %}',  # no quotes
+            '{% get_obj_perms user for contenttype as \'obj_perms" %}',  # wrong quotes
+            '{% get_obj_perms user for contenttype as \'obj_perms" %}',  # wrong quotes
+            '{% get_obj_perms user for contenttype as obj_perms" %}',  # wrong quotes
+            '{% get_obj_perms user for contenttype as obj_perms\' %}',  # wrong quotes
+            '{% get_obj_perms user for contenttype as %}',  # no context_var
+            '{% get_obj_perms for contenttype as "obj_perms" %}',  # no user/group
+            '{% get_obj_perms user contenttype as "obj_perms" %}',  # no "for" bit
+            '{% get_obj_perms user for contenttype "obj_perms" %}',  # no "as" bit
+            '{% get_obj_perms user for as "obj_perms" %}',  # no object
         )
 
         context = {'user': User.get_anonymous(), 'contenttype': self.ctype}
@@ -48,7 +54,7 @@ class GetObjPermsTagTest(TestCase):
             try:
                 render(fullwrong, context)
                 self.fail("Used wrong get_obj_perms tag format: \n\n\t%s\n\n "
-                    "but TemplateSyntaxError have not been raised" % wrong)
+                          "but TemplateSyntaxError have not been raised" % wrong)
             except TemplateSyntaxError:
                 pass
 
@@ -100,9 +106,9 @@ class GetObjPermsTagTest(TestCase):
 
     def test_user(self):
         UserObjectPermission.objects.assign_perm("change_contenttype", self.user,
-            self.ctype)
+                                                 self.ctype)
         GroupObjectPermission.objects.assign_perm("delete_contenttype", self.group,
-            self.ctype)
+                                                  self.ctype)
 
         template = ''.join((
             '{% load guardian_tags %}',
@@ -118,7 +124,7 @@ class GetObjPermsTagTest(TestCase):
 
     def test_group(self):
         GroupObjectPermission.objects.assign_perm("delete_contenttype", self.group,
-            self.ctype)
+                                                  self.ctype)
 
         template = ''.join((
             '{% load guardian_tags %}',

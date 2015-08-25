@@ -1,6 +1,7 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
-import django
-from django.conf import settings
 
 from .conf_test import *
 from .core_test import *

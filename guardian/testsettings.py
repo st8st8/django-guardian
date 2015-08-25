@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+from __future__ import unicode_literals
+from builtins import range
 import os
 import random
 import string

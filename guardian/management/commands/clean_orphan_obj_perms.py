@@ -1,4 +1,9 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+from __future__ import print_function
+
 from django.core.management.base import NoArgsCommand
 
 from guardian.utils import clean_orphan_obj_perms
@@ -21,5 +26,5 @@ class Command(NoArgsCommand):
         removed = clean_orphan_obj_perms()
         if options['verbosity'] > 0:
             print("Removed %d object permission entries with no targets" %
-                removed)
+                  removed)
 

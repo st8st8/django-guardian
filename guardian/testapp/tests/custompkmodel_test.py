@@ -1,4 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 
@@ -15,18 +19,18 @@ class CustomPKModelTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create(username='joe')
         self.ctype = ContentType.objects.create(name='foo', model='bar',
-            app_label='fake-for-guardian-tests')
+                                                app_label='fake-for-guardian-tests')
 
     def test_assign_perm(self):
         assign_perm('contenttypes.change_contenttype', self.user, self.ctype)
         self.assertTrue(self.user.has_perm('contenttypes.change_contenttype',
-            self.ctype))
+                                           self.ctype))
 
     def test_remove_perm(self):
         assign_perm('contenttypes.change_contenttype', self.user, self.ctype)
         self.assertTrue(self.user.has_perm('contenttypes.change_contenttype',
-            self.ctype))
+                                           self.ctype))
         remove_perm('contenttypes.change_contenttype', self.user, self.ctype)
         self.assertFalse(self.user.has_perm('contenttypes.change_contenttype',
-            self.ctype))
+                                            self.ctype))
 

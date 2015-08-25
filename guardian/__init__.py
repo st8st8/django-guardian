@@ -1,7 +1,11 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 """
 Implementation of per object permissions for Django 1.2 or later.
 """
 from __future__ import unicode_literals
+from builtins import str
 
 VERSION = (1, 3)
 

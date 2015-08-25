@@ -1,4 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+from past.builtins import basestring
 
 import six
 import sys
@@ -118,11 +122,11 @@ def import_string(dotted_path):
 
 # Python 3
 try:
-    unicode = unicode  # pyflakes:ignore
+    str = str  # pyflakes:ignore
     basestring = basestring  # pyflakes:ignore
     str = str  # pyflakes:ignore
 except NameError:
-    basestring = unicode = str = str
+    basestring = str = str = str
 
 # Django 1.7 compatibility
 # create_permission API changed: skip the create_models (second

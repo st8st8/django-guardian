@@ -1,4 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+from builtins import object
 from datetime import datetime
 
 import django
@@ -38,14 +42,14 @@ class Project(models.Model):
     name = models.CharField(max_length=128, unique=True)
     created_at = models.DateTimeField(default=datetime.now)
 
-    class Meta:
+    class Meta(object):
         get_latest_by = 'created_at'
 
     def __unicode__(self):
         return self.name
 
-Project.not_a_relation_descriptor = DynamicAccessor()
 
+Project.not_a_relation_descriptor = DynamicAccessor()
 
 Project.not_a_relation_descriptor = DynamicAccessor()
 
@@ -79,5 +83,6 @@ class NonIntPKModel(models.Model):
 
 if django.VERSION > (1, 5):
     from django.contrib.auth.models import AbstractUser
+
     class CustomUser(AbstractUser, GuardianUserMixin):
         custom_id = models.AutoField(primary_key=True)

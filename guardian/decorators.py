@@ -1,4 +1,9 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+from builtins import zip
+from past.builtins import basestring
 
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME

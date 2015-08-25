@@ -1,7 +1,11 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 """
 Convenient shortcuts to manage or check object permissions.
 """
 from __future__ import unicode_literals
+from past.builtins import basestring
 
 from itertools import groupby
 import warnings

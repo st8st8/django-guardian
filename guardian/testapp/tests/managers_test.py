@@ -1,12 +1,16 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+
 from django.test import TestCase
+
 from guardian.compat import mock
 from guardian.managers import UserObjectPermissionManager
 from guardian.managers import GroupObjectPermissionManager
 
 
 class TestManagers(TestCase):
-
     def test_user_manager_assign(self):
         manager = UserObjectPermissionManager()
         manager.assign_perm = mock.Mock()

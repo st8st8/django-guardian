@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
 from itertools import chain
 
@@ -5,6 +8,7 @@ from django.conf import settings
 # Try the new app settings (Django 1.7) and fall back to the old system
 try:
     from django.apps import apps as django_apps
+
     auth_app = django_apps.get_app_config("auth")
 except ImportError:
     from django.contrib.auth import models as auth_app
@@ -20,14 +24,14 @@ from guardian.shortcuts import assign_perm
 
 User = get_user_model()
 
-class ObjectPermissionTestCase(TestCase):
 
+class ObjectPermissionTestCase(TestCase):
     def setUp(self):
         self.group, created = Group.objects.get_or_create(name='jackGroup')
         self.user, created = User.objects.get_or_create(username='jack')
         self.user.groups.add(self.group)
         self.ctype = ContentType.objects.create(name='foo', model='bar',
-            app_label='fake-for-guardian-tests')
+                                                app_label='fake-for-guardian-tests')
         try:
             self.anonymous_user = User.objects.get(pk=settings.ANONYMOUS_USER_ID)
         except User.DoesNotExist:
@@ -39,7 +43,6 @@ class ObjectPermissionTestCase(TestCase):
 
 
 class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
-
     def setUp(self):
         super(ObjectPermissionCheckerTest, self).setUp()
         # Required if MySQL backend is used :/
@@ -96,34 +99,34 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
 
     def test_init(self):
         self.assertRaises(NotUserNorGroup, ObjectPermissionChecker,
-            user_or_group=ContentType())
+                          user_or_group=ContentType())
         self.assertRaises(NotUserNorGroup, ObjectPermissionChecker)
 
     def test_anonymous_user(self):
         user = AnonymousUser()
         check = ObjectPermissionChecker(user)
         # assert anonymous user has no object permissions at all for obj
-        self.assertTrue( [] == list(check.get_perms(self.ctype)) )
+        self.assertTrue([] == list(check.get_perms(self.ctype)))
 
     def test_superuser(self):
         user = User.objects.create(username='superuser', is_superuser=True)
         check = ObjectPermissionChecker(user)
         ctype = ContentType.objects.get_for_model(self.ctype)
         perms = sorted(chain(*Permission.objects
-            .filter(content_type=ctype)
-            .values_list('codename')))
+                             .filter(content_type=ctype)
+                             .values_list('codename')))
         self.assertEqual(perms, check.get_perms(self.ctype))
         for perm in perms:
             self.assertTrue(check.has_perm(perm, self.ctype))
 
     def test_not_active_superuser(self):
         user = User.objects.create(username='not_active_superuser',
-            is_superuser=True, is_active=False)
+                                   is_superuser=True, is_active=False)
         check = ObjectPermissionChecker(user)
         ctype = ContentType.objects.get_for_model(self.ctype)
         perms = sorted(chain(*Permission.objects
-            .filter(content_type=ctype)
-            .values_list('codename')))
+                             .filter(content_type=ctype)
+                             .values_list('codename')))
         self.assertEqual(check.get_perms(self.ctype), [])
         for perm in perms:
             self.assertFalse(check.has_perm(perm, self.ctype))
@@ -150,9 +153,9 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
     def test_get_perms(self):
         group = Group.objects.create(name='group')
         obj1 = ContentType.objects.create(name='ct1', model='foo',
-            app_label='guardian-tests')
+                                          app_label='guardian-tests')
         obj2 = ContentType.objects.create(name='ct2', model='bar',
-            app_label='guardian-tests')
+                                          app_label='guardian-tests')
 
         assign_perms = {
             group: ('change_group', 'delete_group'),
@@ -162,14 +165,14 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
 
         check = ObjectPermissionChecker(self.user)
 
-        for obj, perms in assign_perms.items():
+        for obj, perms in list(assign_perms.items()):
             for perm in perms:
                 UserObjectPermission.objects.assign_perm(perm, self.user, obj)
             self.assertEqual(sorted(perms), sorted(check.get_perms(obj)))
 
         check = ObjectPermissionChecker(self.group)
 
-        for obj, perms in assign_perms.items():
+        for obj, perms in list(assign_perms.items()):
             for perm in perms:
                 GroupObjectPermission.objects.assign_perm(perm, self.group, obj)
             self.assertEqual(sorted(perms), sorted(check.get_perms(obj)))

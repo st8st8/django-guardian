@@ -1,46 +1,14 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# encoding: utf-8
+# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from south.db import db
 from south.v2 import SchemaMigration
 
-from guardian.compat import user_model_label
-
 
 class Migration(SchemaMigration):
     def forwards(self, orm):
-        # Changing field 'GroupObjectPermission.object_pk'
-        db.alter_column('guardian_groupobjectpermission', 'object_pk',
-                        self.gf('django.db.models.fields.CharField')(max_length=255))
-
-        # Changing field 'UserObjectPermission.object_pk'
-        db.alter_column('guardian_userobjectpermission', 'object_pk',
-                        self.gf('django.db.models.fields.CharField')(max_length=255))
-
-        # Removing unique constraint on 'UserObjectPermission', fields ['object_id', 'user', 'content_type', 'permission']
-        db.delete_unique('guardian_userobjectpermission', ['object_id', 'user_id', 'content_type_id', 'permission_id'])
-
-        # Removing unique constraint on 'GroupObjectPermission', fields ['group', 'object_id', 'content_type', 'permission']
-        db.delete_unique('guardian_groupobjectpermission',
-                         ['group_id', 'object_id', 'content_type_id', 'permission_id'])
-
-        # Adding unique constraint on 'GroupObjectPermission', fields ['object_pk', 'group', 'content_type', 'permission']
-        db.create_unique('guardian_groupobjectpermission',
-                         ['object_pk', 'group_id', 'content_type_id', 'permission_id'])
-
-        # Adding unique constraint on 'UserObjectPermission', fields ['object_pk', 'user', 'content_type', 'permission']
-        db.create_unique('guardian_userobjectpermission', ['object_pk', 'user_id', 'content_type_id', 'permission_id'])
-
-
-    def backwards(self, orm):
-        # Changing field 'GroupObjectPermission.object_pk'
-        db.alter_column('guardian_groupobjectpermission', 'object_pk', self.gf('django.db.models.fields.TextField')())
-
-        # Changing field 'UserObjectPermission.object_pk'
-        db.alter_column('guardian_userobjectpermission', 'object_pk', self.gf('django.db.models.fields.TextField')())
-
         # Removing unique constraint on 'UserObjectPermission', fields ['object_pk', 'user', 'content_type', 'permission']
         db.delete_unique('guardian_userobjectpermission', ['object_pk', 'user_id', 'content_type_id', 'permission_id'])
 
@@ -48,12 +16,42 @@ class Migration(SchemaMigration):
         db.delete_unique('guardian_groupobjectpermission',
                          ['object_pk', 'group_id', 'content_type_id', 'permission_id'])
 
-        # Adding unique constraint on 'GroupObjectPermission', fields ['group', 'object_id', 'content_type', 'permission']
-        db.create_unique('guardian_groupobjectpermission',
-                         ['group_id', 'object_id', 'content_type_id', 'permission_id'])
+        # Adding field 'GroupObjectPermission.permission_expiry'
+        db.add_column('guardian_groupobjectpermission', 'permission_expiry',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True),
+                      keep_default=False)
 
-        # Adding unique constraint on 'UserObjectPermission', fields ['object_id', 'user', 'content_type', 'permission']
-        db.create_unique('guardian_userobjectpermission', ['object_id', 'user_id', 'content_type_id', 'permission_id'])
+        # Adding unique constraint on 'GroupObjectPermission', fields ['object_pk', 'group', 'permission']
+        db.create_unique('guardian_groupobjectpermission', ['object_pk', 'group_id', 'permission_id'])
+
+        # Adding field 'UserObjectPermission.permission_expiry'
+        db.add_column('guardian_userobjectpermission', 'permission_expiry',
+                      self.gf('django.db.models.fields.DateTimeField')(null=True, blank=True),
+                      keep_default=False)
+
+        # Adding unique constraint on 'UserObjectPermission', fields ['object_pk', 'user', 'permission']
+        db.create_unique('guardian_userobjectpermission', ['object_pk', 'user_id', 'permission_id'])
+
+
+    def backwards(self, orm):
+        # Removing unique constraint on 'UserObjectPermission', fields ['object_pk', 'user', 'permission']
+        db.delete_unique('guardian_userobjectpermission', ['object_pk', 'user_id', 'permission_id'])
+
+        # Removing unique constraint on 'GroupObjectPermission', fields ['object_pk', 'group', 'permission']
+        db.delete_unique('guardian_groupobjectpermission', ['object_pk', 'group_id', 'permission_id'])
+
+        # Deleting field 'GroupObjectPermission.permission_expiry'
+        db.delete_column('guardian_groupobjectpermission', 'permission_expiry')
+
+        # Adding unique constraint on 'GroupObjectPermission', fields ['object_pk', 'group', 'content_type', 'permission']
+        db.create_unique('guardian_groupobjectpermission',
+                         ['object_pk', 'group_id', 'content_type_id', 'permission_id'])
+
+        # Deleting field 'UserObjectPermission.permission_expiry'
+        db.delete_column('guardian_userobjectpermission', 'permission_expiry')
+
+        # Adding unique constraint on 'UserObjectPermission', fields ['object_pk', 'user', 'content_type', 'permission']
+        db.create_unique('guardian_userobjectpermission', ['object_pk', 'user_id', 'content_type_id', 'permission_id'])
 
 
     models = {
@@ -73,8 +71,8 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '50'})
         },
-        user_model_label: {
-            'Meta': {'object_name': user_model_label.split('.')[-1]},
+        'auth.user': {
+            'Meta': {'object_name': 'User'},
             'date_joined': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.utcnow'}),
             'email': ('django.db.models.fields.EmailField', [], {'max_length': '75', 'blank': 'True'}),
             'first_name': ('django.db.models.fields.CharField', [], {'max_length': '30', 'blank': 'True'}),
@@ -100,24 +98,26 @@ class Migration(SchemaMigration):
             'name': ('django.db.models.fields.CharField', [], {'max_length': '100'})
         },
         'guardian.groupobjectpermission': {
-            'Meta': {'unique_together': "(['group', 'permission', 'content_type', 'object_pk'],)",
+            'Meta': {'unique_together': "([u'group', u'permission', u'object_pk'],)",
                      'object_name': 'GroupObjectPermission'},
             'content_type': (
                 'django.db.models.fields.related.ForeignKey', [], {'to': "orm['contenttypes.ContentType']"}),
             'group': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.Group']"}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'object_pk': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
-            'permission': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.Permission']"})
+            'permission': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.Permission']"}),
+            'permission_expiry': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'})
         },
         'guardian.userobjectpermission': {
-            'Meta': {'unique_together': "(['user', 'permission', 'content_type', 'object_pk'],)",
+            'Meta': {'unique_together': "([u'user', u'permission', u'object_pk'],)",
                      'object_name': 'UserObjectPermission'},
             'content_type': (
                 'django.db.models.fields.related.ForeignKey', [], {'to': "orm['contenttypes.ContentType']"}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'object_pk': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
             'permission': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.Permission']"}),
-            'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['%s']" % user_model_label})
+            'permission_expiry': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
+            'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.User']"})
         }
     }
 

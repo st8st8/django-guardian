@@ -1,4 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from __future__ import unicode_literals
+
 from django.test import TestCase
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import Group, AnonymousUser
@@ -20,16 +24,17 @@ from guardian.utils import get_group_obj_perms_model
 from guardian.utils import get_obj_perms_model
 from guardian.exceptions import NotUserNorGroup
 
+
 User = get_user_model()
 
-class GetAnonymousUserTest(TestCase):
 
+class GetAnonymousUserTest(TestCase):
     def test(self):
         anon = get_anonymous_user()
         self.assertTrue(isinstance(anon, User))
 
-class GetIdentityTest(ObjectPermissionTestCase):
 
+class GetIdentityTest(ObjectPermissionTestCase):
     def test_user(self):
         user, group, org = get_identity(self.user)
         self.assertTrue(isinstance(user, User))
@@ -54,68 +59,64 @@ class GetIdentityTest(ObjectPermissionTestCase):
 
 @skipUnlessTestApp
 class GetUserObjPermsModelTest(TestCase):
-
     def test_for_instance(self):
         project = Project(name='Foobar')
         self.assertEqual(get_user_obj_perms_model(project),
-            ProjectUserObjectPermission)
+                         ProjectUserObjectPermission)
 
     def test_for_class(self):
         self.assertEqual(get_user_obj_perms_model(Project),
-            ProjectUserObjectPermission)
+                         ProjectUserObjectPermission)
 
     def test_default(self):
         self.assertEqual(get_user_obj_perms_model(ContentType),
-            UserObjectPermission)
+                         UserObjectPermission)
 
     def test_user_model(self):
         # this test assumes that there were no direct obj perms model to User
         # model defined (i.e. while testing guardian app in some custom project)
         self.assertEqual(get_user_obj_perms_model(User),
-            UserObjectPermission)
+                         UserObjectPermission)
 
 
 @skipUnlessTestApp
 class GetGroupObjPermsModelTest(TestCase):
-
     def test_for_instance(self):
         project = Project(name='Foobar')
         self.assertEqual(get_group_obj_perms_model(project),
-            ProjectGroupObjectPermission)
+                         ProjectGroupObjectPermission)
 
     def test_for_class(self):
         self.assertEqual(get_group_obj_perms_model(Project),
-            ProjectGroupObjectPermission)
+                         ProjectGroupObjectPermission)
 
     def test_default(self):
         self.assertEqual(get_group_obj_perms_model(ContentType),
-            GroupObjectPermission)
+                         GroupObjectPermission)
 
     def test_group_model(self):
         # this test assumes that there were no direct obj perms model to Group
         # model defined (i.e. while testing guardian app in some custom project)
         self.assertEqual(get_group_obj_perms_model(Group),
-            GroupObjectPermission)
+                         GroupObjectPermission)
+
 
 class GetObjPermsModelTest(TestCase):
-
     def test_image_field(self):
-
         class SomeModel(models.Model):
             image = models.FileField(upload_to='images/')
 
         obj = SomeModel()
         perm_model = get_obj_perms_model(obj, UserObjectPermissionBase,
-            UserObjectPermission)
+                                         UserObjectPermission)
         self.assertEqual(perm_model, UserObjectPermission)
 
     def test_file_field(self):
-
         class SomeModel2(models.Model):
             file = models.FileField(upload_to='images/')
 
         obj = SomeModel2()
         perm_model = get_obj_perms_model(obj, UserObjectPermissionBase,
-            UserObjectPermission)
+                                         UserObjectPermission)
         self.assertEqual(perm_model, UserObjectPermission)
 

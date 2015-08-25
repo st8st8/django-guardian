@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 """
 Exceptions used by django-guardian. All internal and guardian-specific errors
 should extend GuardianError class.
