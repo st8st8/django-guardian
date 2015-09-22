@@ -55,6 +55,7 @@ class BaseGenericObjectPermission(models.Model):
     object_pk = models.CharField(_('object ID'), max_length=255)
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True)
+    permission_expiry_30day_email_sent = models.BooleanField(null=False, default=False, blank=True)
 
     class Meta(object):
         abstract = True
