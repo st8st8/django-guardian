@@ -109,7 +109,7 @@ def get_403_or_None(request, perms, obj=None, login_url=None,
         if return_403:
             if guardian_settings.RENDER_403:
                 try:
-                    response = render(
+                    response = render(request,
                         guardian_settings.TEMPLATE_403, {},
                         RequestContext(request))
                     response.status_code = 403
