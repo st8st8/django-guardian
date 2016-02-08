@@ -23,6 +23,7 @@ from guardian.compat import user_model_label
 from guardian.compat import str
 from guardian.managers import GroupObjectPermissionManager, OrganizationObjectPermissionManager
 from guardian.managers import UserObjectPermissionManager
+from django.conf import settings
 
 
 class BaseObjectPermission(models.Model):
@@ -56,6 +57,7 @@ class BaseGenericObjectPermission(models.Model):
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True)
     permission_expiry_30day_email_sent = models.BooleanField(null=False, default=False, blank=True)
+    permission_expiry_0day_email_sent = models.BooleanField(null=False, default=False, blank=True)
 
     class Meta(object):
         abstract = True
