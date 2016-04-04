@@ -58,7 +58,7 @@ class ObjectPermissionBackend(object):
     def authenticate(self, username, password):
         return None
 
-    def has_perm(self, user_obj, perm, obj=None):
+    def has_perm(self, user_obj, perm, obj=None, check_permission_expiry=True):
         """
         Returns ``True`` if given ``user_obj`` has ``perm`` for ``obj``. If no
         ``obj`` is given, ``False`` is returned.
@@ -90,7 +90,7 @@ class ObjectPermissionBackend(object):
                                     "given obj has '%s'" % (app_label, obj._meta.app_label))
 
         check = ObjectPermissionChecker(user_obj)
-        return check.has_perm(perm, obj)
+        return check.has_perm(perm, obj, permission_expiry=check_permission_expiry)
 
     def get_all_permissions(self, user_obj, obj=None):
         """
