@@ -8,7 +8,8 @@ from past.builtins import basestring
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.utils.functional import wraps
-from django.db.models import Model, get_model
+from django.apps import apps
+from django.db.models import Model
 from django.db.models.base import ModelBase
 from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404
@@ -76,7 +77,8 @@ def permission_required(perm, lookup_variables=None, **kwargs):
 
     """
     login_url = kwargs.pop('login_url', settings.LOGIN_URL)
-    redirect_field_name = kwargs.pop('redirect_field_name', REDIRECT_FIELD_NAME)
+    redirect_field_name = kwargs.pop(
+        'redirect_field_name', REDIRECT_FIELD_NAME)
     return_403 = kwargs.pop('return_403', False)
     accept_global_perms = kwargs.pop('accept_global_perms', False)
 
@@ -99,7 +101,7 @@ def permission_required(perm, lookup_variables=None, **kwargs):
                     if len(splitted) != 2:
                         raise GuardianError("If model should be looked up from "
                                             "string it needs format: 'app_label.ModelClass'")
-                    model = get_model(*splitted)
+                    model = apps.get_model(*splitted)
                 elif issubclass(model.__class__, (Model, ModelBase, QuerySet)):
                     pass
                 else:
@@ -124,9 +126,7 @@ def permission_required(perm, lookup_variables=None, **kwargs):
             if response:
                 return response
             return view_func(request, *args, **kwargs)
-
         return wraps(view_func)(_wrapped_view)
-
     return decorator
 
 

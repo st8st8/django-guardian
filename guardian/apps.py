@@ -14,4 +14,3 @@ class GuardianConfig(AppConfig):
     def ready(self):
         if settings.MONKEY_PATCH:
             monkey_patch_user()
-        

@@ -1,34 +1,26 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 """
 Convenient shortcuts to manage or check object permissions.
 """
 from __future__ import unicode_literals
-from past.builtins import basestring
-
-from itertools import groupby
-import warnings
 
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
 from django.db.models import Count, Q
+from django.apps import apps
 from django.shortcuts import _get_queryset
+from itertools import groupby
 
-from organizations.models import Organization
-from guardian.compat import get_user_model
 from guardian.compat import basestring
+from guardian.compat import get_user_model
 from guardian.core import ObjectPermissionChecker
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import WrongAppError
 from guardian.utils import get_anonymous_user
-from guardian.utils import get_identity, get_organization_obj_perms_model
 from guardian.utils import get_group_obj_perms_model
+from guardian.utils import get_identity
 from guardian.utils import get_user_obj_perms_model
 import warnings
-from guardian.utils import get_group_obj_perms_model
 
 
 def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
@@ -108,9 +100,7 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
 
 def assign(perm, user_or_group, obj=None):
     """ Depreciated function name left in for compatibility"""
-    warnings.warn(
-        "Shortcut function 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.",
-        DeprecationWarning)
+    warnings.warn("Shortcut function 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.", DeprecationWarning)
     return assign_perm(perm, user_or_group, obj)
 
 
@@ -169,6 +159,33 @@ def get_perms(user_or_group, obj):
     return check.get_perms(obj)
 
 
+def get_user_perms(user, obj):
+    """
+    Returns permissions for given user and object pair, as list of
+    strings, only those assigned directly for the user.
+    """
+    check = ObjectPermissionChecker(user)
+    return check.get_user_perms(obj)
+
+
+def get_group_perms(user_or_group, obj):
+    """
+    Returns permissions for given user/group and object pair, as list of
+    strings. It returns only those which are inferred through groups.
+    """
+    check = ObjectPermissionChecker(user_or_group)
+    return check.get_group_perms(obj)
+
+
+def get_organization_perms(user_or_group, obj):
+    """
+    Returns permissions for given user/group and object pair, as list of
+    strings. It returns only those which are inferred through groups.
+    """
+    check = ObjectPermissionChecker(user_or_group)
+    return check.get_organization_perms(obj)
+
+
 def get_perms_for_model(cls):
     """
     Returns queryset of all Permission objects for the given class. It is
@@ -176,7 +193,7 @@ def get_perms_for_model(cls):
     """
     if isinstance(cls, basestring):
         app_label, model_name = cls.split('.')
-        model = models.get_model(app_label, model_name)
+        model = apps.get_model(app_label, model_name)
     else:
         model = cls
     ctype = ContentType.objects.get_for_model(model)
@@ -253,8 +270,13 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
         # TODO: Do not hit db for each user!
         users = {}
         for user in get_users_with_perms(obj,
-                                         with_group_users=with_group_users):
-            users[user] = sorted(get_perms(user, obj))
+                                         with_group_users=with_group_users,
+                                         with_superusers=with_superusers):
+            # TODO: Support the case of set with_group_users but not with_superusers.
+            if with_group_users or with_superusers:
+                users[user] = sorted(get_perms(user, obj))
+            else:
+                users[user] = sorted(get_user_perms(user, obj))
         return users
 
 
@@ -305,8 +327,8 @@ def get_groups_with_perms(obj, attach_perms=False):
         # TODO: Do not hit db for each group!
         groups = {}
         for group in get_groups_with_perms(obj):
-            if not group in groups:
-                groups[group] = sorted(get_perms(group, obj))
+            if group not in groups:
+                groups[group] = sorted(get_group_perms(group, obj))
         return groups
 
 
@@ -336,10 +358,13 @@ def get_organizations_with_perms(obj, attach_perms=False):
 
 
 def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=False,
-        with_superuser=True, accept_global_perms=False):
+                         with_superuser=True, accept_global_perms=True):
     """
     Returns queryset of objects for which a given ``user`` has *all*
     permissions present at ``perms``.
+
+    If ``perms`` is an empty list, then it returns objects for which
+    a given ``user`` has *any* object permission.
 
     :param user: ``User`` or ``AnonymousUser`` instance for which objects would
       be returned.
@@ -354,8 +379,10 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     :param use_groups: if ``False``, wouldn't check user's groups object
       permissions. Default is ``True``.
     :param any_perm: if True, any of permission in sequence is accepted. Default is ``False``.
-    :param with_superuser: if ``True`` returns the entire queryset if not it will
-    only return objects the user has explicit permissions. Default is ``True``.
+    :param with_superuser: if ``True`` and if ``user.is_superuser`` is set,
+      returns the entire queryset. Otherwise will only return objects the user
+      has explicit permissions. This must be ``True`` for the accept_global_perms
+      parameter to have any affect. Default is ``True``.
     :param accept_global_perms: if ``True`` takes global permissions into account.
       Object based permissions are taken into account if more than one permission is handed in in perms and at least
       one of these perms is not globally set. If any_perm is set to false then the intersection of matching object
@@ -392,6 +419,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         [<Group some group>]
 
     Take global permissions into account:
+
         >>> jack = User.objects.get(username='jack')
         >>> assign_perm('auth.change_group', jack) # this will set a global permission
         >>> get_objects_for_user(jack, 'auth.change_group')
@@ -403,6 +431,35 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         >>> get_objects_for_user(jack, ['auth.change_group', 'auth.delete_group'], any_perm) # this retrieves union
         [<Group some group>, <Group other group>]
 
+    If accept_global_perms is set to ``True``, then all assigned global
+    permissions will also be taken into account.
+
+    - Scenario 1: a user has view permissions generally defined on the model
+      'books' but no object based permission on a single book instance:
+
+        - If accept_global_perms is ``True``: List of all books will be
+          returned.
+        - If accept_global_perms is ``False``: list will be empty.
+
+    - Scenario 2: a user has view permissions generally defined on the model
+      'books' and also has an object based permission to view book 'Whatever':
+
+        - If accept_global_perms is ``True``: List of all books will be
+          returned.
+        - If accept_global_perms is ``False``: list will only contain book
+          'Whatever'.
+
+    - Scenario 3: a user only has object based permission on book 'Whatever':
+
+        - If accept_global_perms is ``True``: List will only contain book
+          'Whatever'.
+        - If accept_global_perms is ``False``: List will only contain book
+          'Whatever'.
+
+    - Scenario 4: a user does not have any permission:
+
+        - If accept_global_perms is ``True``: Empty list.
+        - If accept_global_perms is ``False``: Empty list.
     """
     if isinstance(perms, basestring):
         perms = [perms]
@@ -432,13 +489,13 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
                 ctype = new_ctype
 
     # Compute queryset and ctype if still missing
-    if ctype is None and klass is None:
-        raise WrongAppError("Cannot determine content type")
-    elif ctype is None and klass is not None:
+    if ctype is None and klass is not None:
         queryset = _get_queryset(klass)
         ctype = ContentType.objects.get_for_model(queryset.model)
     elif ctype is not None and klass is None:
         queryset = _get_queryset(ctype.model_class())
+    elif klass is None:
+        raise WrongAppError("Cannot determine content type")
     else:
         queryset = _get_queryset(klass)
         if ctype.model_class() != queryset.model:
@@ -464,11 +521,11 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     # a superuser has by default assigned global perms for any
     if accept_global_perms and with_superuser:
         for code in codenames:
-            if user.has_perm(app_label + '.' + code):
+            if user.has_perm(ctype.app_label + '.' + code):
                 global_perms.add(code)
         for code in global_perms:
             codenames.remove(code)
-        ## prerequisite: there must be elements in global_perms otherwise just follow the procedure for
+        # prerequisite: there must be elements in global_perms otherwise just follow the procedure for
         # object based permissions only AND
         # 1. codenames is empty, which means that permissions are ONLY set globally, therefore return the full queryset.
         # OR
@@ -485,30 +542,37 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         elif len(global_perms) > 0 and (len(codenames) > 0):
             has_global_perms = True
 
-
-    # Now we should extract list of pk values for which we would filter queryset
+    # Now we should extract list of pk values for which we would filter
+    # queryset
     user_model = get_user_obj_perms_model(queryset.model)
     user_obj_perms_queryset = (user_model.objects
                                .filter(user=user)
-                               .filter(permission__content_type=ctype)
-                               .filter(permission__codename__in=codenames))
+                               .filter(permission__content_type=ctype))
+    if len(codenames):
+        user_obj_perms_queryset = user_obj_perms_queryset.filter(
+            permission__codename__in=codenames)
+    direct_fields = ['content_object__pk', 'permission__codename']
+    generic_fields = ['object_pk', 'permission__codename']
     if user_model.objects.is_generic():
-        fields = ['object_pk', 'permission__codename']
+        user_fields = generic_fields
     else:
-        fields = ['content_object__pk', 'permission__codename']
+        user_fields = direct_fields
 
     if use_groups:
         group_model = get_group_obj_perms_model(queryset.model)
         group_filters = {
             'permission__content_type': ctype,
-            'permission__codename__in': codenames,
             'group__%s' % get_user_model().groups.field.related_query_name(): user,
         }
+        if len(codenames):
+            group_filters.update({
+                'permission__codename__in': codenames,
+            })
         groups_obj_perms_queryset = group_model.objects.filter(**group_filters)
         if group_model.objects.is_generic():
-            group_fields = ['object_pk', 'permission__codename']
+            group_fields = generic_fields
         else:
-            group_fields = ['content_object__pk', 'permission__codename']
+            group_fields = direct_fields
 
         # Orgs
         organization_model = get_organization_obj_perms_model(queryset.model)
@@ -519,16 +583,16 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         }
         organizations_obj_perms_queryset = organization_model.objects.filter(**organization_filters)
         if organization_model.objects.is_generic():
-            organization_fields = ['object_pk', 'permission__codename']
+            organization_fields = generic_fields
         else:
-            organization_fields = ['content_object__pk', 'permission__codename']
+            organization_fields = direct_fields
 
-        if not any_perm:
-            user_obj_perms = user_obj_perms_queryset.values_list(*fields)
+        if not any_perm and len(codenames) and not has_global_perms:
+            user_obj_perms = user_obj_perms_queryset.values_list(*user_fields)
             groups_obj_perms = groups_obj_perms_queryset.values_list(*group_fields)
-            organizations_obj_perms = organizations_obj_perms_queryset.values_list(*organization_fields)
-            data = list(user_obj_perms) + list(groups_obj_perms) + list(organizations_obj_perms)
-            keyfunc = lambda t: t[0]  # sorting/grouping by pk (first in result tuple)
+            data = list(user_obj_perms) + list(groups_obj_perms)
+            # sorting/grouping by pk (first in result tuple)
+            keyfunc = lambda t: t[0]
             data = sorted(data, key=keyfunc)
             pk_list = []
             for pk, group in groupby(data, keyfunc):
@@ -539,25 +603,27 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             return objects
 
     if not any_perm and len(codenames) > 1:
-        counts = user_obj_perms_queryset.values(fields[0]).annotate(object_pk_count=Count(fields[0]))
-        user_obj_perms_queryset = counts.filter(object_pk_count__gte=len(codenames))
+        counts = user_obj_perms_queryset.values(
+            user_fields[0]).annotate(object_pk_count=Count(user_fields[0]))
+        user_obj_perms_queryset = counts.filter(
+            object_pk_count__gte=len(codenames))
 
-    values = user_obj_perms_queryset.values_list(fields[0], flat=True)
+    values = user_obj_perms_queryset.values_list(user_fields[0], flat=True)
     if user_model.objects.is_generic():
-        values = [int(v) for v in values]
-    objects = queryset.filter(pk__in=values)
+        values = list(values)
+    q = Q(pk__in=values)
     if use_groups:
-        values = groups_obj_perms_queryset.values_list(fields[0], flat=True)
+        values = groups_obj_perms_queryset.values_list(group_fields[0], flat=True)
         if group_model.objects.is_generic():
-            values = [int(v) for v in values]
-        objects |= queryset.filter(pk__in=values)
+            values = list(values)
+        q |= Q(pk__in=values)
 
         values = organizations_obj_perms_queryset.values_list(fields[0], flat=True)
         if organization_model.objects.is_generic():
-            values = [int(v) for v in values]
-        objects |= queryset.filter(pk__in=values)
+            values = list(values)
+        q |= Q(pk__in=values)
 
-    return objects
+    return queryset.filter(q)
 
 
 def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_global_perms=True):
@@ -645,13 +711,13 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
                 ctype = new_ctype
 
     # Compute queryset and ctype if still missing
-    if ctype is None and klass is None:
-        raise WrongAppError("Cannot determine content type")
-    elif ctype is None and klass is not None:
+    if ctype is None and klass is not None:
         queryset = _get_queryset(klass)
         ctype = ContentType.objects.get_for_model(queryset.model)
     elif ctype is not None and klass is None:
         queryset = _get_queryset(ctype.model_class())
+    elif klass is None:
+        raise WrongAppError("Cannot determine content type")
     else:
         queryset = _get_queryset(klass)
         if ctype.model_class() != queryset.model:
@@ -673,29 +739,37 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
         if len(global_perms) > 0 and (len(codenames) == 0 or any_perm):
             return queryset
 
-    # Now we should extract list of pk values for which we would filter queryset
+    # Now we should extract list of pk values for which we would filter
+    # queryset
     group_model = get_group_obj_perms_model(queryset.model)
     groups_obj_perms_queryset = (group_model.objects
                                  .filter(group=group)
-                                 .filter(permission__content_type=ctype)
-                                 .filter(permission__codename__in=codenames))
+                                 .filter(permission__content_type=ctype))
+    if len(codenames):
+        groups_obj_perms_queryset = groups_obj_perms_queryset.filter(
+            permission__codename__in=codenames)
     if group_model.objects.is_generic():
         fields = ['object_pk', 'permission__codename']
     else:
         fields = ['content_object__pk', 'permission__codename']
-    groups_obj_perms = groups_obj_perms_queryset.values_list(*fields)
-    data = list(groups_obj_perms)
+    if not any_perm and len(codenames):
+        groups_obj_perms = groups_obj_perms_queryset.values_list(*fields)
+        data = list(groups_obj_perms)
 
-    keyfunc = lambda t: t[0]  # sorting/grouping by pk (first in result tuple)
-    data = sorted(data, key=keyfunc)
-    pk_list = []
-    for pk, group in groupby(data, keyfunc):
-        obj_codenames = set((e[1] for e in group))
-        if any_perm or codenames.issubset(obj_codenames):
-            pk_list.append(pk)
+        keyfunc = lambda t: t[0]  # sorting/grouping by pk (first in result tuple)
+        data = sorted(data, key=keyfunc)
+        pk_list = []
+        for pk, group in groupby(data, keyfunc):
+            obj_codenames = set((e[1] for e in group))
+            if any_perm or codenames.issubset(obj_codenames):
+                pk_list.append(pk)
+        objects = queryset.filter(pk__in=pk_list)
+        return objects
 
-    objects = queryset.filter(pk__in=pk_list)
-    return objects
+    values = groups_obj_perms_queryset.values_list(fields[0], flat=True)
+    if group_model.objects.is_generic():
+        values = list(values)
+    return queryset.filter(pk__in=values)
 
 
 def get_objects_for_organization(organization, perms, klass=None, any_perm=False):
@@ -812,3 +886,4 @@ def get_objects_for_organization(organization, perms, klass=None, any_perm=False
 
     objects = queryset.filter(pk__in=pk_list)
     return objects
+

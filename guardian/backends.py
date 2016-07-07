@@ -28,15 +28,18 @@ def check_user_support(user_obj):
     permission checks
 
     Checks if the given user is supported. Anonymous users need explicit
-    activation via ANONYMOUS_USER_ID
+    activation via ANONYMOUS_USER_NAME
     """
     # This is how we support anonymous users - simply try to retrieve User
     # instance and perform checks for that predefined user
     if not user_obj.is_authenticated():
-        # If anonymous user permission is disabled then they are always unauthorized
-        if settings.ANONYMOUS_USER_ID is None:
+        # If anonymous user permission is disabled then they are always
+        # unauthorized
+        if settings.ANONYMOUS_USER_NAME is None:
             return False, user_obj
-        user_obj = get_user_model().objects.get(pk=settings.ANONYMOUS_USER_ID)
+        User = get_user_model()
+        lookup = {User.USERNAME_FIELD: settings.ANONYMOUS_USER_NAME}
+        user_obj = User.objects.get(**lookup)
 
     return True, user_obj
 

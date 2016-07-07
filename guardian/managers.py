@@ -2,14 +2,12 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
-
-import warnings
-
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
 
 from guardian.exceptions import ObjectNotPersisted
 from guardian.models import Permission
+import warnings
 
 
 # TODO: consolidate UserObjectPermissionManager and GroupObjectPermissionManager
@@ -17,6 +15,7 @@ from guardian.utils import calculate_permission_expiry
 
 
 class BaseObjectPermissionManager(models.Manager):
+
     def is_generic(self):
         try:
             self.model._meta.get_field('object_pk')
@@ -51,9 +50,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
 
     def assign(self, perm, user, obj):
         """ Depreciated function name left in for compatibility"""
-        warnings.warn(
-            "UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.",
-            DeprecationWarning)
+        warnings.warn("UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.", DeprecationWarning)
         return self.assign_perm(perm, user, obj)
 
     def remove_perm(self, perm, user, obj):
@@ -104,9 +101,7 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
 
     def assign(self, perm, user, obj):
         """ Depreciated function name left in for compatibility"""
-        warnings.warn(
-            "UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.",
-            DeprecationWarning)
+        warnings.warn("UserObjectPermissionManager method 'assign' is being renamed to 'assign_perm'. Update your code accordingly as old name will be depreciated in 2.0 version.", DeprecationWarning)
         return self.assign_perm(perm, user, obj)
 
     def remove_perm(self, perm, group, obj):

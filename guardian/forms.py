@@ -8,7 +8,8 @@ from django.utils.translation import ugettext as _
 
 from guardian.shortcuts import assign_perm
 from guardian.shortcuts import remove_perm
-from guardian.shortcuts import get_perms
+from guardian.shortcuts import get_user_perms
+from guardian.shortcuts import get_group_perms
 from guardian.shortcuts import get_perms_for_model
 
 
@@ -20,6 +21,8 @@ class BaseObjectPermissionsForm(forms.Form):
 
     def __init__(self, obj, *args, **kwargs):
         """
+        Constructor for BaseObjectPermissionsForm.
+
         :param obj: Any instance which form would use to manage object
           permissions"
         """
@@ -175,7 +178,7 @@ class GroupObjectPermissionsForm(BaseObjectPermissionsForm):
         super(GroupObjectPermissionsForm, self).__init__(*args, **kwargs)
 
     def get_obj_perms_field_initial(self):
-        perms = get_perms(self.group, self.obj)
+        perms = get_group_perms(self.group, self.obj)
         return perms
 
     def save_obj_perms(self):
@@ -222,7 +225,7 @@ class OrganizationObjectPermissionsForm(BaseObjectPermissionsForm):
         super(OrganizationObjectPermissionsForm, self).__init__(*args, **kwargs)
 
     def get_obj_perms_field_initial(self):
-        perms = get_perms(self.organization, self.obj)
+        perms = get_organization_perms(self.group, self.obj)
         return perms
 
     def save_obj_perms(self):

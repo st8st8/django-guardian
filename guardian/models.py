@@ -2,8 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
-from builtins import str
-from builtins import object
 
 from django.db import models
 from django.core.exceptions import ValidationError
@@ -18,12 +16,10 @@ except ImportError:
 
 from django.utils.translation import ugettext_lazy as _
 
-from organizations.models import Organization
 from guardian.compat import user_model_label
-from guardian.compat import str
+from guardian.compat import unicode
 from guardian.managers import GroupObjectPermissionManager, OrganizationObjectPermissionManager
 from guardian.managers import UserObjectPermissionManager
-from django.conf import settings
 
 
 class BaseObjectPermission(models.Model):
@@ -37,10 +33,10 @@ class BaseObjectPermission(models.Model):
         abstract = True
 
     def __unicode__(self):
-        return u'%s | %s | %s' % (
-            str(self.content_object),
-            str(getattr(self, 'user', False) or getattr(self, 'user', False) or self.organization),
-            str(self.permission.codename))
+        return '%s | %s | %s' % (
+            unicode(self.content_object),
+            unicode(getattr(self, 'user', False) or self.organization),
+            unicode(self.permission.codename))
 
     def save(self, *args, **kwargs):
         content_type = ContentType.objects.get_for_model(self.content_object)
@@ -120,10 +116,8 @@ class OrganizationObjectPermission(OrganizationObjectPermissionBase, BaseGeneric
 # As with Django 1.7, you can't use the get_user_model at this point
 # because the app registry isn't ready yet (we're inside a model file).
 import django
-
 if django.VERSION < (1, 7) and settings.MONKEY_PATCH:
     from . import monkey_patch_user
-
     monkey_patch_user()
 
 setattr(Group, 'add_obj_perm',

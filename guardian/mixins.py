@@ -2,17 +2,13 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
-from past.builtins import basestring
-from builtins import object
 
 from collections import Iterable
-
 from django.conf import settings
 from django.contrib.auth.decorators import REDIRECT_FIELD_NAME
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ImproperlyConfigured
 from django.core.exceptions import PermissionDenied
-
 from guardian.compat import basestring
 from guardian.models import UserObjectPermission
 from guardian.utils import get_403_or_None
@@ -66,8 +62,8 @@ class PermissionRequiredMixin(object):
     If a `get_object()` method is defined either manually or by including
     another mixin (for example ``SingleObjectMixin``) or ``self.object`` is
     defined then the permission will be tested against that specific instance,
-    alternatively you can specify `get_permission_object()` method if ``self.object`` 
-    or `get_object()` does not return the object against you want to test permission 
+    alternatively you can specify `get_permission_object()` method if ``self.object``
+    or `get_object()` does not return the object against you want to test permission
 
     .. note:
        Testing of a permission against a specific object instance requires an
@@ -125,13 +121,14 @@ class PermissionRequiredMixin(object):
         *Default*: ``False``,  If accept_global_perms would be set to True, then
          mixing would first check for global perms, if none found, then it will
          proceed to check object level permissions.
+
     ``PermissionRequiredMixin.permission_object``
          *Default*: ``None``, object against which test the permission; if None fallback
-         to ``self.get_permission_object()`` which return ``self.get_object()`` 
+         to ``self.get_permission_object()`` which return ``self.get_object()``
          or ``self.object`` by default.
 
     """
-    ### default class view settings
+    # default class view settings
     login_url = settings.LOGIN_URL
     permission_required = None
     redirect_field_name = REDIRECT_FIELD_NAME
@@ -174,8 +171,10 @@ class PermissionRequiredMixin(object):
         """
         obj = self.get_permission_object()
 
+
         forbidden = get_403_or_None(request,
-                                    perms=self.get_required_permissions(request),
+                                    perms=self.get_required_permissions(
+                                        request),
                                     obj=obj,
                                     login_url=self.login_url,
                                     redirect_field_name=self.redirect_field_name,
@@ -211,6 +210,7 @@ class PermissionRequiredMixin(object):
 
 
 class GuardianUserMixin(object):
+
     @staticmethod
     def get_anonymous():
         return get_anonymous_user()

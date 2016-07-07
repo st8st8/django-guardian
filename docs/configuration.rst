@@ -19,19 +19,24 @@ and hook guardian's authentication backend::
        'guardian.backends.ObjectPermissionBackend',
    )
 
-As ``django-guardian`` supports anonymous user's object permissions we also
-need to add following to our settings module::
-
-   ANONYMOUS_USER_ID = -1
-
 .. note::
    Once project is configured to work with ``django-guardian``, calling
    ``syncdb`` management command would create ``User`` instance for
    anonymous user support (with name of ``AnonymousUser``).
 
-If ``ANONYMOUS_USER_ID`` is set to ``None``, anonymous user object permissions
-are disabled. You may need to choose this option if creating a ``User`` object
-to represent anonymous users would be problematic in your environment.
+.. note::
+
+   The Guardian anonymous user is different to the Django Anonymous user.  The
+   Django Anonymous user does not have an entry in the database, however the
+   Guardian anonymous user does. This means that the following code will return
+   an unexpected result:
+
+   .. code-block:: python
+
+      from guardian.compat import get_user_model
+      User = get_user_model()
+      anon = User.get_anonymous()
+      anon.is_anonymous()   # returns False
 
 We can change id to whatever we like. Project should be now ready to use object
 permissions.
@@ -40,8 +45,7 @@ permissions.
 Optional settings
 =================
 
-In addition to required ``ANONYMOUS_USER_ID`` setting, guardian has following,
-optional configuration variables:
+Guardian has following, optional configuration variables:
 
 
 .. setting:: GUARDIAN_RAISE_403
@@ -93,18 +97,22 @@ Tells parts of guardian what template to use for responses with status code
 ``403.html``.
 
 
-.. setting:: ANONYMOUS_DEFAULT_USERNAME_VALUE
+.. setting:: ANONYMOUS_USER_NAME
 
-ANONYMOUS_DEFAULT_USERNAME_VALUE
---------------------------------
+ANONYMOUS_USER_NAME
+-------------------
 
-.. versionadded:: 1.1
+.. versionadded:: 1.4.2
 
-Due to changes introduced by Django 1.5 user model can have differently named
-``username`` field (it can be removed too, but ``guardian`` currently depends
-on it). After ``syncdb`` command we create anonymous user for convenience,
-however it might be necessary to set this configuration in order to set proper
-value at ``username`` field.
+This is the username of the anonymous user. Used to create the anonymous user
+and subsequently fetch the anonymous user as required.
+
+If ``ANONYMOUS_USER_NAME`` is set to ``None``, anonymous user object
+permissions-are disabled. You may need to choose this option if creating an
+``User`` object-to represent anonymous users would be problematic in your
+environment.
+
+Defaults to ``"AnonymousUser"``.
 
 .. seealso:: https://docs.djangoproject.com/en/1.5/topics/auth/customizing/#substituting-a-custom-user-model
 

@@ -1,22 +1,24 @@
+"""
+Implementation of per object permissions for Django.
+"""
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
-"""
-Implementation of per object permissions for Django 1.2 or later.
-"""
 from __future__ import unicode_literals
-from builtins import str
-
-VERSION = (1, 3)
-
-__version__ = '.'.join((str(each) for each in VERSION[:4]))
+from . import checks
 
 
-def get_version():
-    """
-    Returns shorter version (digit parts only) as string.
-    """
-    return '.'.join((str(each) for each in VERSION[:4]))
+try:
+    from .version import version as __version__
+    __version__split__ = __version__.split(".")
+    VERSION = tuple([int(each) for each in __version__split__[:3]] + __version__split__[3:])
+
+    def get_version():
+        """
+        Returns shorter version (digit parts only) as string.
+        """
+        return '.'.join((str(each) for each in VERSION[:3]))
+except ImportError:
+    pass
 
 
 default_app_config = 'guardian.apps.GuardianConfig'
@@ -26,7 +28,6 @@ def monkey_patch_user():
     from .compat import get_user_model
     from .utils import get_anonymous_user
     from .models import UserObjectPermission
-
     User = get_user_model()
     # Prototype User and Group methods
     setattr(User, 'get_anonymous', staticmethod(lambda: get_anonymous_user()))
@@ -34,4 +35,3 @@ def monkey_patch_user():
             lambda self, perm, obj: UserObjectPermission.objects.assign_perm(perm, self, obj))
     setattr(User, 'del_obj_perm',
             lambda self, perm, obj: UserObjectPermission.objects.remove_perm(perm, self, obj))
-

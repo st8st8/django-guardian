@@ -1,3 +1,80 @@
+Release 1.4.3 (Apr 03, 2016)
+============================
+
+* guardian.VERSION should be a tuple, not a list. Fixes #411.
+* Support for prefetching permissions.
+* Fixed union between queries.
+* Allow specifying an empty list of permissions for get_objects_for_group.
+* Mixed group and user direction relations broken. Fixes #271.
+* Lookup anonymous user using custom username field.
+* Fix up processing of ANONYMOUS_USER_NAME where set to None. Fixes #409.
+* Require TEMPLATE_403 to exist if RENDER_403 set.
+
+Release 1.4.2 (Mar 09, 2016)
+============================
+
+* Test against django-master (Django 1.10 - not released).
+* Django 1.10 fixes.
+* Fixes for documentation.
+* PEP8 fixes.
+* Fix distributed files in MANIFEST.in
+* Use pytest for tests.
+* Add dependancy on django-environ.
+* Don't use ANONYMOUS_USER_ID. Uses ANONYMOUS_DEFAULT_USERNAME
+  and USERNAME_FIELD instead.
+* Use setuptools_scm for versioning.
+* Initialise admin context using each_context for Django >= 1.8.
+* Add missing with_superusers parameter to get_users_with_perms().
+* Use setuptools scm for versioning.
+* Fixes for example_project.
+* Only display permissions if permission actually assigned.
+* When using `attach_perms` with `get_users_with_perms`, and `with_group_users`
+  and `with_superusers` set to `False`, only directly assigned permissions are
+  now returned, and not effective (infered) permissions.
+
+Release 1.4.1 (Jan 10, 2016)
+============================
+
+* Fix broken documentation.
+* Fix setup.py errors (#387).
+* Fix tox tests.
+* Fix travis tests.
+
+
+Release 1.4.0 (Jan 8, 2016)
+===========================
+
+* Drop support for Django < 1.7
+* Drop support for django south migrations.
+* Remove depreciated code.
+* Fix many Django depreciated warnings.
+* Fix tests and example_project.
+* Work around for postgresql specific Django bug (#366). This is a regression
+  that was introduced in version 1.3.2.
+* Updates to documentation.
+* Require can_change permission to change object perms in admin.
+* Fixes broke admin URLS (#376 and #381).
+* Tests now work with Mysql and Postgresql as well as sqlite.
+* Uses django-environ for tests.
+
+
+Release 1.3.2 (Nov 14, 2015)
+============================
+
+* Fixes tests for all versions of Django.
+* Tests pass for Django 1.9b1.
+* Drops support for Django < 1.5
+* Add Russian translation.
+* Various bug fixes.
+* Ensure password for anonymous user is set to unusable, not None.
+
+
+Release 1.3.1 (Oct 20, 2015)
+============================
+
+* Fixes for 1.8 compat
+
+
 Release 1.3 (Jun 3, 2015)
 =========================
 
