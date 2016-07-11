@@ -84,17 +84,13 @@ class ObjectPermissionChecker(object):
             return True
         return perm in self.get_perms(obj, permission_expiry)
 
-    def get_group_filters(self, obj, permission_expiry=False):
+    def get_organization_filters(self, obj, permission_expiry=False):
         User = get_user_model()
         ctype = ContentType.objects.get_for_model(obj)
 
         # Django organizations
         organization_model = get_organization_obj_perms_model(obj)
         organization_rel_name = organization_model.permission.field.related_query_name()
-        if permission_expiry:
-            kwargs1 = {"%s__permission_expiry" % organization_rel_name: None}
-            kwargs2 = {"%s__permission_expiry__gte" % organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
-            org_q = (Q(**kwargs1) | Q(**kwargs2),)
         if self.user:
             fieldname = '%s__organization__%s' % (
                 organization_rel_name,
@@ -111,7 +107,13 @@ class ObjectPermissionChecker(object):
         else:
             organization_filters['%s__content_object' % organization_rel_name] = obj
 
-        return organization_filters
+        org_q = tuple()
+        if permission_expiry:
+            kwargs1 = {"%s__permission_expiry" % organization_rel_name: None}
+            kwargs2 = {"%s__permission_expiry__gte" % organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
+            org_q = (Q(**kwargs1) | Q(**kwargs2),)
+
+        return organization_filters, org_q
 
     def get_group_filters(self, obj, permission_expiry=False):
         User = get_user_model()
@@ -135,7 +137,7 @@ class ObjectPermissionChecker(object):
         else:
             group_filters['%s__content_object' % group_rel_name] = obj
 
-        return group_filters
+        return group_filters, tuple()
 
     def get_user_filters(self, obj, permission_expiry=False):
         ctype = ContentType.objects.get_for_model(obj)
@@ -151,14 +153,20 @@ class ObjectPermissionChecker(object):
         else:
             user_filters['%s__content_object' % related_name] = obj
 
-        return user_filters
+        user_q = tuple()
+        if permission_expiry:
+            kwargs1 = {"%s__permission_expiry" % related_name: None}
+            kwargs2 = {"%s__permission_expiry__gte" % related_name: datetime.utcnow().replace(tzinfo=utc)}
+            user_q = (Q(**kwargs1) | Q(**kwargs2),)
+
+        return user_filters, user_q
 
     def get_user_perms(self, obj, permission_expiry=False):
         ctype = ContentType.objects.get_for_model(obj)
 
         perms_qs = Permission.objects.filter(content_type=ctype)
-        user_filters = self.get_user_filters(obj)
-        user_perms_qs = perms_qs.filter(**user_filters)
+        user_filters, user_q = self.get_user_filters(obj, permission_expiry)
+        user_perms_qs = perms_qs.filter(*user_q, **user_filters)
         user_perms = user_perms_qs.values_list("codename", flat=True)
 
         return user_perms
@@ -167,7 +175,7 @@ class ObjectPermissionChecker(object):
         ctype = ContentType.objects.get_for_model(obj)
 
         perms_qs = Permission.objects.filter(content_type=ctype)
-        group_filters = self.get_group_filters(obj)
+        group_filters, group_q = self.get_group_filters(obj, permission_expiry)
         group_perms_qs = perms_qs.filter(**group_filters)
         group_perms = group_perms_qs.values_list("codename", flat=True)
 
@@ -177,11 +185,11 @@ class ObjectPermissionChecker(object):
         ctype = ContentType.objects.get_for_model(obj)
 
         perms_qs = Permission.objects.filter(content_type=ctype)
-        group_filters = self.get_organization_filters(obj)
-        group_perms_qs = perms_qs.filter(**organization_filters)
-        group_perms = group_perms_qs.values_list("codename", flat=True)
+        organization_filters, org_q = self.get_organization_filters(obj, permission_expiry)
+        organization_perms_qs = perms_qs.filter(*org_q, **organization_filters)
+        organization_perms = organization_perms_qs.values_list("codename", flat=True)
 
-        return group_perms
+        return organization_perms
 
     def get_perms(self, obj, permission_expiry=False):
         """
@@ -193,9 +201,8 @@ class ObjectPermissionChecker(object):
         if self.user and not self.user.is_active:
             return []
         ctype = ContentType.objects.get_for_model(obj)
-        key = self.get_local_cache_key(obj)
+        key = self.get_local_cache_key(obj, permission_expiry)
         if key not in self._obj_perms_cache:
-
 
             if self.user and self.user.is_superuser:
                 perms = list(chain(*Permission.objects
@@ -205,29 +212,30 @@ class ObjectPermissionChecker(object):
                 # Query user and group permissions separately and then combine
                 # the results to avoid a slow query
                 user_perms = self.get_user_perms(obj, permission_expiry)
-                group_perms = self.get_group_perms(obj, permission_expiry)
-                perms = list(set(chain(user_perms, group_perms)))
+                org_perms = self.get_organization_perms(obj, permission_expiry)
+                perms = list(set(chain(user_perms, org_perms)))
             elif self.group:
-                group_filters = self.get_group_filters(obj)
+                group_filters, group_q = self.get_group_filters(obj, permission_expiry)
                 perms = list(set(chain(*Permission.objects
                                        .filter(content_type=ctype)
                                        .filter(**group_filters)
                                        .values_list("codename"))))
             elif self.organization:
-                group_filters = self.get_organzation_filters(obj)
+                organization_filters, org_q = self.get_organization_filters(obj, permission_expiry)
                 perms = list(set(chain(*Permission.objects
                                        .filter(content_type=ctype)
-                                       .filter(*org_q, **organization_filters)
+                                        .filter(*org_q)
+                                       .filter(**organization_filters)
                                        .values_list("codename"))))
             self._obj_perms_cache[key] = perms
         return self._obj_perms_cache[key]
 
-    def get_local_cache_key(self, obj):
+    def get_local_cache_key(self, obj, permission_expiry=False):
         """
         Returns cache key for ``_obj_perms_cache`` dict.
         """
         ctype = ContentType.objects.get_for_model(obj)
-        return (ctype.id, force_text(obj.pk))
+        return (ctype.id, force_text(obj.pk), permission_expiry)
 
     def prefetch_perms(self, objects):
         """

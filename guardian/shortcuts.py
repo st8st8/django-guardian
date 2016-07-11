@@ -23,6 +23,8 @@ from guardian.utils import get_group_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 import warnings
 
+from organizations import models as organization_models
+
 
 def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
     """
@@ -347,7 +349,7 @@ def get_organizations_with_perms(obj, attach_perms=False):
             }
         else:
             group_filters = {'%s__content_object' % group_rel_name: obj}
-        groups = Organization.objects.filter(**group_filters).distinct()
+        groups = organization_models.Organization.objects.filter(**group_filters).distinct()
         return groups
     else:
         # TODO: Do not hit db for each group!
@@ -619,7 +621,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             values = list(values)
         q |= Q(pk__in=values)
 
-        values = organizations_obj_perms_queryset.values_list(fields[0], flat=True)
+        values = organizations_obj_perms_queryset.values_list(group_fields[0], flat=True)
         if organization_model.objects.is_generic():
             values = list(values)
         q |= Q(pk__in=values)

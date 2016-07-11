@@ -3,6 +3,8 @@
 from __future__ import unicode_literals
 
 from collections import OrderedDict
+
+import django
 from builtins import str
 from builtins import object
 from django import forms
@@ -22,7 +24,7 @@ from guardian.compat import OrderedDict, get_user_model, get_model_name
 from guardian.forms import UserObjectPermissionsForm
 from guardian.forms import GroupObjectPermissionsForm
 from guardian.forms import OrganizationObjectPermissionsForm
-from guardian.shortcuts import get_user_perms
+from guardian.shortcuts import get_user_perms, get_organization_perms
 from guardian.shortcuts import get_group_perms
 from guardian.shortcuts import get_users_with_perms, get_perms, get_organizations_with_perms
 from guardian.shortcuts import get_groups_with_perms
@@ -214,7 +216,7 @@ class GuardedModelAdminMixin(object):
         organization_perms = OrderedDict(
             sorted(
                 get_organizations_with_perms(obj, attach_perms=True).items(),
-                key=lambda group: group.name
+                key=lambda group: group[0].name
             )
         )
 
