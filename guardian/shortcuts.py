@@ -17,8 +17,9 @@ from guardian.core import ObjectPermissionChecker
 from guardian.exceptions import MixedContentTypeError
 from guardian.exceptions import WrongAppError
 from guardian.utils import get_anonymous_user
-from guardian.utils import get_group_obj_perms_model
 from guardian.utils import get_identity
+from guardian.utils import get_organization_obj_perms_model
+from guardian.utils import get_group_obj_perms_model
 from guardian.utils import get_user_obj_perms_model
 import warnings
 
@@ -772,7 +773,7 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
     return queryset.filter(pk__in=values)
 
 
-def get_objects_for_organization(organization, perms, klass=None, any_perm=False):
+def get_objects_for_organization(organization, perms, klass=None, any_perm=False, accept_global_perms=True):
     """
     Returns queryset of objects for which a given ``organization`` has *all*
     permissions present at ``perms``.
@@ -846,13 +847,13 @@ def get_objects_for_organization(organization, perms, klass=None, any_perm=False
                 ctype = new_ctype
 
     # Compute queryset and ctype if still missing
-    if ctype is None and klass is None:
-        raise WrongAppError("Cannot determine content type")
-    elif ctype is None and klass is not None:
+    if ctype is None and klass is not None:
         queryset = _get_queryset(klass)
         ctype = ContentType.objects.get_for_model(queryset.model)
     elif ctype is not None and klass is None:
         queryset = _get_queryset(ctype.model_class())
+    elif klass is None:
+        raise WrongAppError("Cannot determine content type")
     else:
         queryset = _get_queryset(klass)
         if ctype.model_class() != queryset.model:
@@ -862,28 +863,36 @@ def get_objects_for_organization(organization, perms, klass=None, any_perm=False
     # At this point, we should have both ctype and queryset and they should
     # match which means: ctype.model_class() == queryset.model
     # we should also have ``codenames`` list
-
+            
     # Now we should extract list of pk values for which we would filter queryset
     organization_model = get_organization_obj_perms_model(queryset.model)
     organizations_obj_perms_queryset = (organization_model.objects
                                         .filter(organization=organization)
-                                        .filter(permission__content_type=ctype)
-                                        .filter(permission__codename__in=codenames))
+                                        .filter(permission__content_type=ctype))
+    if len(codenames):
+        organizations_obj_perms_queryset = organizations_obj_perms_queryset.filter(
+            permission__codename__in=codenames)
     if organization_model.objects.is_generic():
         fields = ['object_pk', 'permission__codename']
     else:
         fields = ['content_object__pk', 'permission__codename']
-    organizations_obj_perms = organizations_obj_perms_queryset.values_list(*fields)
-    data = list(organizations_obj_perms)
 
-    keyfunc = lambda t: t[0]  # sorting/organizationing by pk (first in result tuple)
-    data = sorted(data, key=keyfunc)
-    pk_list = []
-    for pk, organization in groupby(data, keyfunc):
-        obj_codenames = set((e[1] for e in organization))
-        if any_perm or codenames.issubset(obj_codenames):
-            pk_list.append(pk)
+    if not any_perm and len(codenames):
+        organizations_obj_perms = organizations_obj_perms_queryset.values_list(*fields)
+        data = list(organizations_obj_perms)
 
-    objects = queryset.filter(pk__in=pk_list)
-    return objects
+        keyfunc = lambda t: t[0]  # sorting/organizationing by pk (first in result tuple)
+        data = sorted(data, key=keyfunc)
+        pk_list = []
+        for pk, organization in groupby(data, keyfunc):
+            obj_codenames = set((e[1] for e in organization))
+            if any_perm or codenames.issubset(obj_codenames):
+                pk_list.append(pk)
+        objects = queryset.filter(pk__in=pk_list)
+        return objects
+
+    values = organizations_obj_perms_queryset.values_list(fields[0], flat=True)
+    if organization_model.objects.is_generic():
+        values = list(values)
+    return queryset.filter(pk__in=values)
 

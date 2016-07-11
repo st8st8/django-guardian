@@ -21,6 +21,7 @@ from organizations.models import Organization
 from guardian.compat import OrderedDict, get_user_model, get_model_name
 from guardian.forms import UserObjectPermissionsForm
 from guardian.forms import GroupObjectPermissionsForm
+from guardian.forms import OrganizationObjectPermissionsForm
 from guardian.shortcuts import get_user_perms
 from guardian.shortcuts import get_group_perms
 from guardian.shortcuts import get_users_with_perms, get_perms, get_organizations_with_perms
@@ -521,7 +522,7 @@ class GuardedModelAdmin(GuardedModelAdminMixin, admin.ModelAdmin):
         context['organization_perms'] = get_organization_perms(organization, obj)
         context['form'] = form
 
-		request.current_app = self.admin_site.name
+        request.current_app = self.admin_site.name
         return render_to_response(self.get_obj_perms_manage_organization_template(),
             context, RequestContext(request))
 

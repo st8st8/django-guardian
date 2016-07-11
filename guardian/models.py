@@ -6,8 +6,10 @@ from __future__ import unicode_literals
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import Group
+from organizations.models import Organization
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.conf import settings
 
 try:
     from django.contrib.contenttypes.fields import GenericForeignKey
