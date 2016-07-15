@@ -213,7 +213,7 @@ def calculate_permission_expiry(perm, renewal_period):
     expiry = perm.permission_expiry
     if expiry is None:
         return (datetime.utcnow() + renewal_period).replace(tzinfo=utc)
-    elif expiry < datetime.now().replace(tzinfo=utc):
-        return datetime.now().replace(tzinfo=utc) + renewal_period
+    elif expiry < datetime.utcnow().replace(tzinfo=utc):
+        return datetime.utcnow().replace(tzinfo=utc) + renewal_period
     else:
         return expiry.replace(tzinfo=utc) + renewal_period

@@ -11,6 +11,8 @@ from django.apps import apps
 from django.shortcuts import _get_queryset
 from itertools import groupby
 
+from django.utils.timezone import utc
+
 from guardian.compat import basestring
 from guardian.compat import get_user_model
 from guardian.core import ObjectPermissionChecker
@@ -24,6 +26,7 @@ from guardian.utils import get_user_obj_perms_model
 import warnings
 
 from organizations import models as organization_models
+from datetime import datetime
 
 
 def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
@@ -204,7 +207,7 @@ def get_perms_for_model(cls):
 
 
 def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
-                         with_group_users=True):
+                         with_group_users=True, permission_expiry=False):
     """
     Returns queryset of all ``User`` objects with *any* object permissions for
     the given ``obj``.
@@ -253,6 +256,12 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
         else:
             user_filters = {'%s__content_object' % related_name: obj}
         qset = Q(**user_filters)
+
+        if permission_expiry:
+            kwargs1 = {"%s__permission_expiry" % related_name: None}
+            kwargs2 = {"%s__permission_expiry__gte" % related_name: datetime.utcnow().replace(tzinfo=utc)}
+            qset &= (Q(**kwargs1) | Q(**kwargs2))
+
         if with_group_users:
             group_model = get_group_obj_perms_model(obj)
             group_rel_name = group_model.group.field.related_query_name()
@@ -266,15 +275,36 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
                     'groups__%s__content_object' % group_rel_name: obj,
                 }
             qset = qset | Q(**group_filters)
+
+            org_model = get_organization_obj_perms_model(obj)
+            organization_rel_name = org_model.organization.field.related_query_name()
+            if org_model.objects.is_generic():
+                organization_filters = {
+                    'organizations_organization__%s__content_type' % organization_rel_name: ctype,
+                    'organizations_organization__%s__object_pk' % organization_rel_name: obj.pk,
+                }
+            else:
+                organization_filters = {
+                    'organizations_organization__%s__content_object' % organization_rel_name: obj
+                }
+
+            if permission_expiry:
+                kwargs1 = {"organizations_organization__%s__permission_expiry" % organization_rel_name: None}
+                kwargs2 = {"organizations_organization__%s__permission_expiry__gte" % organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
+                qset &= (Q(**kwargs1) | Q(**kwargs2))
+
+            qset = qset | Q(**organization_filters)
         if with_superusers:
             qset = qset | Q(is_superuser=True)
+
         return get_user_model().objects.filter(qset).distinct()
     else:
         # TODO: Do not hit db for each user!
         users = {}
         for user in get_users_with_perms(obj,
                                          with_group_users=with_group_users,
-                                         with_superusers=with_superusers):
+                                         with_superusers=with_superusers,
+                                         permission_expiry=permission_expiry):
             # TODO: Support the case of set with_group_users but not with_superusers.
             if with_group_users or with_superusers:
                 users[user] = sorted(get_perms(user, obj))
@@ -341,23 +371,23 @@ def get_organizations_with_perms(obj, attach_perms=False):
         # It's much easier without attached perms so we do it first if that is
         # the case
         org_model = get_organization_obj_perms_model(obj)
-        group_rel_name = org_model.organization.field.related_query_name()
+        organization_rel_name = org_model.organization.field.related_query_name()
         if org_model.objects.is_generic():
-            group_filters = {
-                '%s__content_type' % group_rel_name: ctype,
-                '%s__object_pk' % group_rel_name: obj.pk,
+            organization_filters = {
+                '%s__content_type' % organization_rel_name: ctype,
+                '%s__object_pk' % organization_rel_name: obj.pk,
             }
         else:
-            group_filters = {'%s__content_object' % group_rel_name: obj}
-        groups = organization_models.Organization.objects.filter(**group_filters).distinct()
-        return groups
+            organization_filters = {'%s__content_object' % organization_rel_name: obj}
+        organizations = organization_models.Organization.objects.filter(**organization_filters).distinct()
+        return organizations
     else:
-        # TODO: Do not hit db for each group!
-        groups = {}
-        for group in get_organizations_with_perms(obj):
-            if not group in groups:
-                groups[group] = sorted(get_perms(group, obj))
-        return groups
+        # TODO: Do not hit db for each organization!
+        organizations = {}
+        for organization in get_organizations_with_perms(obj):
+            if not organization in organizations:
+                organizations[organization] = sorted(get_perms(organization, obj))
+        return organizations
 
 
 def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=False,
@@ -593,7 +623,8 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         if not any_perm and len(codenames) and not has_global_perms:
             user_obj_perms = user_obj_perms_queryset.values_list(*user_fields)
             groups_obj_perms = groups_obj_perms_queryset.values_list(*group_fields)
-            data = list(user_obj_perms) + list(groups_obj_perms)
+            organizations_obj_perms = organizations_obj_perms_queryset.values_list(*organization_fields)
+            data = list(user_obj_perms) + list(groups_obj_perms) + list(organizations_obj_perms)
             # sorting/grouping by pk (first in result tuple)
             keyfunc = lambda t: t[0]
             data = sorted(data, key=keyfunc)

@@ -9,6 +9,8 @@ from builtins import str
 from builtins import object
 from django import forms
 from django.conf import settings
+from django.template import RequestContext
+
 from guardian.compat import url
 from django.db.models import Q
 from django.contrib import admin
@@ -16,7 +18,6 @@ from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.urlresolvers import reverse
 from django.shortcuts import render_to_response, get_object_or_404, redirect
-from django.template import RequestContext
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from organizations.models import Organization
