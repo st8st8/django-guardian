@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db.models import Count, Q
 from django.apps import apps
 from django.shortcuts import _get_queryset
@@ -206,6 +207,100 @@ def get_perms_for_model(cls):
     return Permission.objects.filter(content_type=ctype)
 
 
+def get_users_with_permission(obj, perm, attach_perms=False, with_superusers=False,
+                         with_group_users=True, permission_expiry=False):
+    qset = get_unattached_users_with_perms_qset(obj, perm,
+        with_group_users=with_group_users,
+        with_superusers=with_superusers,
+        permission_expiry=permission_expiry
+    )
+    if not attach_perms:
+        user_model = get_user_obj_perms_model(obj)
+        related_name = user_model.user.field.related_query_name()
+        ret = get_user_model().objects.filter(qset).distinct()
+        return ret
+    else:
+        raise NotImplementedError
+
+
+def get_unattached_users_with_perms_qset(obj, perm, permission_expiry=False, with_group_users=True, with_superusers=False):
+    # It's much easier without attached perms so we do it first if that is
+    # the case
+
+    # JOINing into the perms table is a no-go - would have to be done three times, for users, groups and orgs.
+    # Getting perm id first allows us to forgo this JOIN
+    perm_id = None
+    if perm:
+        perm_id = cache.get("permission_id_{0}".format(perm))
+        if not perm_id:
+            perm_id = Permission.objects.get(codename=perm).id
+            cache.set("permission_id_{0}".format(perm), perm_id, 86400)
+    ctype = ContentType.objects.get_for_model(obj)
+    user_model = get_user_obj_perms_model(obj)
+    related_name = user_model.user.field.related_query_name()
+    if user_model.objects.is_generic():
+        user_filters = {
+            '%s__content_type' % related_name: ctype,
+            '%s__object_pk' % related_name: obj.pk,
+        }
+        if perm_id:
+            user_filters.update({
+                '%s__permission_id' % related_name: perm_id,
+            })
+    else:
+        user_filters = {'%s__content_object' % related_name: obj}
+    qset = Q(**user_filters)
+
+    if permission_expiry:
+        kwargs1 = {"%s__permission_expiry" % related_name: None}
+        kwargs2 = {"%s__permission_expiry__gte" % related_name: datetime.utcnow().replace(tzinfo=utc)}
+        qset &= (Q(**kwargs1) | Q(**kwargs2))
+
+    if with_group_users:
+        group_model = get_group_obj_perms_model(obj)
+        group_rel_name = group_model.group.field.related_query_name()
+        if group_model.objects.is_generic():
+            group_filters = {
+                'groups__%s__content_type' % group_rel_name: ctype,
+                'groups__%s__object_pk' % group_rel_name: obj.pk,
+            }
+            if perm_id:
+                group_filters.update({
+                    'groups__%s__permission_id' % group_rel_name: perm_id,
+                })
+        else:
+            group_filters = {
+                'groups__%s__content_object' % group_rel_name: obj,
+            }
+        qset = qset | Q(**group_filters)
+
+        org_model = get_organization_obj_perms_model(obj)
+        organization_rel_name = org_model.organization.field.related_query_name()
+        if org_model.objects.is_generic():
+            organization_filters = {
+                'organizations_organization__%s__content_type' % organization_rel_name: ctype,
+                'organizations_organization__%s__object_pk' % organization_rel_name: obj.pk,
+            }
+            if perm_id:
+                organization_filters.update({
+                    'organizations_organization__%s__permission_id' % organization_rel_name: perm_id,
+                })
+        else:
+            organization_filters = {
+                'organizations_organization__%s__content_object' % organization_rel_name: obj
+            }
+
+        if permission_expiry:
+            kwargs1 = {"organizations_organization__%s__permission_expiry" % organization_rel_name: None}
+            kwargs2 = {"organizations_organization__%s__permission_expiry__gte" % organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
+            qset &= (Q(**kwargs1) | Q(**kwargs2))
+
+        qset = qset | Q(**organization_filters)
+    if with_superusers:
+        qset = qset | Q(is_superuser=True)
+    return qset
+
+
 def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
                          with_group_users=True, permission_expiry=False):
     """
@@ -242,61 +337,12 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
         {<User: joe>: [u'change_flatpage']}
 
     """
-    ctype = ContentType.objects.get_for_model(obj)
     if not attach_perms:
-        # It's much easier without attached perms so we do it first if that is
-        # the case
-        user_model = get_user_obj_perms_model(obj)
-        related_name = user_model.user.field.related_query_name()
-        if user_model.objects.is_generic():
-            user_filters = {
-                '%s__content_type' % related_name: ctype,
-                '%s__object_pk' % related_name: obj.pk,
-            }
-        else:
-            user_filters = {'%s__content_object' % related_name: obj}
-        qset = Q(**user_filters)
-
-        if permission_expiry:
-            kwargs1 = {"%s__permission_expiry" % related_name: None}
-            kwargs2 = {"%s__permission_expiry__gte" % related_name: datetime.utcnow().replace(tzinfo=utc)}
-            qset &= (Q(**kwargs1) | Q(**kwargs2))
-
-        if with_group_users:
-            group_model = get_group_obj_perms_model(obj)
-            group_rel_name = group_model.group.field.related_query_name()
-            if group_model.objects.is_generic():
-                group_filters = {
-                    'groups__%s__content_type' % group_rel_name: ctype,
-                    'groups__%s__object_pk' % group_rel_name: obj.pk,
-                }
-            else:
-                group_filters = {
-                    'groups__%s__content_object' % group_rel_name: obj,
-                }
-            qset = qset | Q(**group_filters)
-
-            org_model = get_organization_obj_perms_model(obj)
-            organization_rel_name = org_model.organization.field.related_query_name()
-            if org_model.objects.is_generic():
-                organization_filters = {
-                    'organizations_organization__%s__content_type' % organization_rel_name: ctype,
-                    'organizations_organization__%s__object_pk' % organization_rel_name: obj.pk,
-                }
-            else:
-                organization_filters = {
-                    'organizations_organization__%s__content_object' % organization_rel_name: obj
-                }
-
-            if permission_expiry:
-                kwargs1 = {"organizations_organization__%s__permission_expiry" % organization_rel_name: None}
-                kwargs2 = {"organizations_organization__%s__permission_expiry__gte" % organization_rel_name: datetime.utcnow().replace(tzinfo=utc)}
-                qset &= (Q(**kwargs1) | Q(**kwargs2))
-
-            qset = qset | Q(**organization_filters)
-        if with_superusers:
-            qset = qset | Q(is_superuser=True)
-
+        qset = get_unattached_users_with_perms_qset(obj, None,
+            with_group_users=with_group_users,
+            with_superusers=with_superusers,
+            permission_expiry=permission_expiry
+        )
         return get_user_model().objects.filter(qset).distinct()
     else:
         # TODO: Do not hit db for each user!
