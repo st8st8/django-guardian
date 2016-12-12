@@ -25,7 +25,7 @@ class BaseObjectPermissionManager(models.Manager):
 
 
 class UserObjectPermissionManager(BaseObjectPermissionManager):
-    def assign_perm(self, perm, user, obj, renewal_period=None):
+    def assign_perm(self, perm, user, obj, renewal_period=None, subscribe_to_emails=True):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
         ``user``.
@@ -45,6 +45,10 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
         obj_perm, created = self.get_or_create(**kwargs)
 
         obj_perm.permission_expiry = calculate_permission_expiry(obj_perm, renewal_period)
+
+        if not subscribe_to_emails:
+            obj_perm.permission_expiry_0day_email_sent = True
+            obj_perm.permission_expiry_30day_email_sent = True
         obj_perm.save()
         return obj_perm
 
@@ -77,7 +81,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
 
 
 class GroupObjectPermissionManager(BaseObjectPermissionManager):
-    def assign_perm(self, perm, group, obj, renewal_period=None):
+    def assign_perm(self, perm, group, obj, renewal_period=None, subscribe_to_emails=True):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
         ``group``.
@@ -125,7 +129,7 @@ class GroupObjectPermissionManager(BaseObjectPermissionManager):
 
 
 class OrganizationObjectPermissionManager(BaseObjectPermissionManager):
-    def assign_perm(self, perm, organization, obj, renewal_period=None):
+    def assign_perm(self, perm, organization, obj, renewal_period=None, subscribe_to_emails=True):
         """
         Assigns permission with given ``perm`` for an instance ``obj`` and
         ``organization``.

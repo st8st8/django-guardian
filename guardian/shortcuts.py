@@ -30,7 +30,7 @@ from organizations import models as organization_models
 from datetime import datetime
 
 
-def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
+def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to_emails=True):
     """
     Assigns permission to user/group and object pair.
 
@@ -96,13 +96,13 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None):
     perm = perm.split('.')[-1]
     if user:
         model = get_user_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, user, obj, renewal_period)
+        return model.objects.assign_perm(perm, user, obj, renewal_period, subscribe_to_emails)
     if group:
         model = get_group_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, group, obj, renewal_period)
+        return model.objects.assign_perm(perm, group, obj, renewal_period, subscribe_to_emails)
     if organization:
         model = get_organization_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, organization, obj, renewal_period)
+        return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
 
 
 def assign(perm, user_or_group, obj=None):

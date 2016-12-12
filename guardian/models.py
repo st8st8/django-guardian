@@ -51,7 +51,7 @@ class BaseObjectPermission(models.Model):
 
 class BaseGenericObjectPermission(models.Model):
     content_type = models.ForeignKey(ContentType)
-    object_pk = models.CharField(_('object ID'), max_length=255)
+    object_pk = models.CharField(_('object ID'), max_length=255, db_index=True)
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True, db_index=True)
     permission_expiry_30day_email_sent = models.BooleanField(null=False, default=False, blank=True, db_index=True)
