@@ -29,7 +29,7 @@ class BaseObjectPermission(models.Model):
     Abstract ObjectPermission class. Actual class should additionally define
     a ``content_object`` field and either ``user`` or ``group`` field.
     """
-    permission = models.ForeignKey(Permission)
+    permission = models.ForeignKey(Permission, on_delete=models.CASCADE)
 
     class Meta(object):
         abstract = True
@@ -50,7 +50,7 @@ class BaseObjectPermission(models.Model):
 
 
 class BaseGenericObjectPermission(models.Model):
-    content_type = models.ForeignKey(ContentType)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_pk = models.CharField(_('object ID'), max_length=255, db_index=True)
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True, db_index=True)
@@ -65,7 +65,7 @@ class UserObjectPermissionBase(BaseObjectPermission):
     """
     **Manager**: :manager:`UserObjectPermissionManager`
     """
-    user = models.ForeignKey(user_model_label)
+    user = models.ForeignKey(user_model_label, on_delete=models.CASCADE)
 
     objects = UserObjectPermissionManager()
 
@@ -83,7 +83,7 @@ class GroupObjectPermissionBase(BaseObjectPermission):
     """
     **Manager**: :manager:`GroupObjectPermissionManager`
     """
-    group = models.ForeignKey(Group)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
 
     objects = GroupObjectPermissionManager()
 
@@ -101,7 +101,7 @@ class OrganizationObjectPermissionBase(BaseObjectPermission):
     """
     **Manager**: :manager:`GroupObjectPermissionManager`
     """
-    organization = models.ForeignKey(Organization)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
     objects = OrganizationObjectPermissionManager()
 

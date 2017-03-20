@@ -46,7 +46,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
 
         obj_perm.permission_expiry = calculate_permission_expiry(obj_perm, renewal_period)
 
-        if not subscribe_to_emails:
+        if subscribe_to_emails:
             obj_perm.permission_expiry_0day_email_sent = True
             obj_perm.permission_expiry_30day_email_sent = True
         obj_perm.save()
