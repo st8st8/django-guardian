@@ -17,7 +17,7 @@ from django.contrib import admin
 from django.contrib import messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.core.urlresolvers import reverse
-from django.shortcuts import render_to_response, get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from organizations.models import Organization
@@ -284,7 +284,7 @@ class GuardedModelAdminMixin(object):
         # https://github.com/django/django/commit/cf1f36bb6eb34fafe6c224003ad585a647f6117b
         request.current_app = self.admin_site.name
 
-        return render_to_response(self.get_obj_perms_manage_template(), context, RequestContext(request))
+        return render(request, self.get_obj_perms_manage_template(), context)
 
     def get_obj_perms_manage_template(self):
         """
@@ -335,7 +335,7 @@ class GuardedModelAdminMixin(object):
 
         request.current_app = self.admin_site.name
 
-        return render_to_response(self.get_obj_perms_manage_user_template(), context, RequestContext(request))
+        return render(request, self.get_obj_perms_manage_user_template(), context)
 
     def get_obj_perms_manage_user_template(self):
         """
@@ -393,7 +393,7 @@ class GuardedModelAdminMixin(object):
 
         request.current_app = self.admin_site.name
 
-        return render_to_response(self.get_obj_perms_manage_group_template(), context, RequestContext(request))
+        return render(request, self.get_obj_perms_manage_group_template(), context)
 
     def get_obj_perms_manage_group_template(self):
         """
@@ -526,8 +526,8 @@ class GuardedModelAdmin(GuardedModelAdminMixin, admin.ModelAdmin):
         context['form'] = form
 
         request.current_app = self.admin_site.name
-        return render_to_response(self.get_obj_perms_manage_organization_template(),
-            context, RequestContext(request))
+        return render(request, self.get_obj_perms_manage_organization_template(),
+            context)
 
     def get_obj_perms_manage_organization_template(self):
         return self.obj_perms_manage_organization_template
