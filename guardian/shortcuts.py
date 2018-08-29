@@ -50,7 +50,7 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
     >>> from django.contrib.sites.models import Site
     >>> from guardian.models import User
     >>> from guardian.shortcuts import assign_perm
-    >>> site = Site.objects.get_current()
+    >>> site = Site.objects.get_current(request)
     >>> user = User.objects.create(username='joe')
     >>> assign_perm("change_site", user, site)
     <UserObjectPermission: example.com | joe | change_site>

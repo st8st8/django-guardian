@@ -191,7 +191,7 @@ class ObjectPermissionChecker(object):
 
         return organization_perms
 
-    def get_perms(self, obj, permission_expiry=False):
+    def get_perms(self, obj, permission_expiry=False, include_group_perms=True):
         """
         Returns list of ``codename``'s of all permissions for given ``obj``.
 
@@ -201,7 +201,7 @@ class ObjectPermissionChecker(object):
         if self.user and not self.user.is_active:
             return []
         ctype = ContentType.objects.get_for_model(obj)
-        key = self.get_local_cache_key(obj, permission_expiry)
+        key = self.get_local_cache_key(obj, include_group_perms, permission_expiry)
 
         if key not in self._obj_perms_cache:
 
@@ -213,8 +213,11 @@ class ObjectPermissionChecker(object):
                 # Query user and group permissions separately and then combine
                 # the results to avoid a slow query
                 user_perms = self.get_user_perms(obj, permission_expiry)
-                org_perms = self.get_organization_perms(obj, permission_expiry)
-                perms = list(set(chain(user_perms, org_perms)))
+                if include_group_perms:
+                    org_perms = self.get_organization_perms(obj, permission_expiry)
+                    perms = list(set(chain(user_perms, org_perms)))
+                else:
+                    perms = user_perms
             elif self.group:
                 group_filters, group_q = self.get_group_filters(obj, permission_expiry)
                 perms = list(set(chain(*Permission.objects
@@ -231,12 +234,12 @@ class ObjectPermissionChecker(object):
             self._obj_perms_cache[key] = perms
         return self._obj_perms_cache[key]
 
-    def get_local_cache_key(self, obj, permission_expiry=False):
+    def get_local_cache_key(self, obj, include_group_perms=True, permission_expiry=False):
         """
         Returns cache key for ``_obj_perms_cache`` dict.
         """
         ctype = ContentType.objects.get_for_model(obj)
-        return (ctype.id, force_text(obj.pk), permission_expiry)
+        return (ctype.id, force_text(obj.pk), include_group_perms, permission_expiry)
 
     def prefetch_perms(self, objects):
         """

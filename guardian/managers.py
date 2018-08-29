@@ -52,7 +52,7 @@ class UserObjectPermissionManager(BaseObjectPermissionManager):
         else:
             obj_perm.permission_expiry_0day_email_sent = True
             obj_perm.permission_expiry_30day_email_sent = True
-            
+
         obj_perm.save()
         return obj_perm
 
