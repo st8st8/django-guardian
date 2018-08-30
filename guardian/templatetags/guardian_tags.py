@@ -54,7 +54,7 @@ class ObjectPermissionsNode(template.Node):
             return ''
 
         check = ObjectPermissionChecker(for_whom)
-        perms = check.get_perms(obj, self.include_group_permissions)
+        perms = check.get_perms(obj, include_group_perms=self.include_group_permissions)
 
         context[self.context_var] = perms
         return ''
