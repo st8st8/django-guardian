@@ -1,13 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
-from builtins import object
-
 from django.db import models
-
-from guardian.compat import get_user_model
+from guardian.compat import get_user_model, is_authenticated
 from guardian.conf import settings
+from guardian.core import ObjectPermissionChecker
+from guardian.ctypes import get_content_type
 from guardian.exceptions import WrongAppError
 from guardian.core import ObjectPermissionChecker
 
@@ -32,7 +30,7 @@ def check_user_support(user_obj):
     """
     # This is how we support anonymous users - simply try to retrieve User
     # instance and perform checks for that predefined user
-    if not user_obj.is_authenticated():
+    if not is_authenticated(user_obj):
         # If anonymous user permission is disabled then they are always
         # unauthorized
         if settings.ANONYMOUS_USER_NAME is None:
@@ -89,8 +87,14 @@ class ObjectPermissionBackend(object):
         if '.' in perm:
             app_label, perm = perm.split('.')
             if app_label != obj._meta.app_label:
-                raise WrongAppError("Passed perm has app label of '%s' and "
-                                    "given obj has '%s'" % (app_label, obj._meta.app_label))
+                # Check the content_type app_label when permission
+                # and obj app labels don't match.
+                ctype = get_content_type(obj)
+                if app_label != ctype.app_label:
+                    raise WrongAppError("Passed perm has app label of '%s' while "
+                                        "given obj has app label '%s' and given obj"
+                                        "content_type has app label '%s'" %
+                                        (app_label, obj._meta.app_label, ctype.app_label))
 
         check = ObjectPermissionChecker(user_obj)
         return check.has_perm(perm, obj, permission_expiry=check_permission_expiry)

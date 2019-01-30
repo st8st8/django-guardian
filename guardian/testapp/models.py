@@ -4,14 +4,19 @@ from datetime import datetime
 from django.db import models
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth.models import AbstractUser, AbstractBaseUser
+from django.utils.encoding import python_2_unicode_compatible
 
 from guardian.mixins import GuardianUserMixin
 from guardian.models import UserObjectPermissionBase
 from guardian.models import GroupObjectPermissionBase
 
 
+@python_2_unicode_compatible
 class Post(models.Model):
     title = models.CharField('title', max_length=64)
+
+    def __str__(self):
+        return self.title
 
 
 class DynamicAccessor(object):
@@ -24,11 +29,11 @@ class DynamicAccessor(object):
 
 
 class ProjectUserObjectPermission(UserObjectPermissionBase):
-    content_object = models.ForeignKey('Project')
+    content_object = models.ForeignKey('Project', on_delete=models.CASCADE)
 
 
 class ProjectGroupObjectPermission(GroupObjectPermissionBase):
-    content_object = models.ForeignKey('Project')
+    content_object = models.ForeignKey('Project', on_delete=models.CASCADE)
 
 
 class Project(models.Model):
@@ -38,7 +43,7 @@ class Project(models.Model):
     class Meta:
         get_latest_by = 'created_at'
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
 
@@ -46,9 +51,10 @@ Project.not_a_relation_descriptor = DynamicAccessor()
 
 
 class MixedGroupObjectPermission(GroupObjectPermissionBase):
-    content_object = models.ForeignKey('Mixed')
+    content_object = models.ForeignKey('Mixed', on_delete=models.CASCADE)
 
 
+@python_2_unicode_compatible
 class Mixed(models.Model):
     """
     Model for tests obj perms checks with generic user object permissions model
@@ -56,14 +62,15 @@ class Mixed(models.Model):
     """
     name = models.CharField(max_length=128, unique=True)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
 
 class ReverseMixedUserObjectPermission(UserObjectPermissionBase):
-    content_object = models.ForeignKey('ReverseMixed')
+    content_object = models.ForeignKey('ReverseMixed', on_delete=models.CASCADE)
 
 
+@python_2_unicode_compatible
 class ReverseMixed(models.Model):
     """
     Model for tests obj perms checks with generic group object permissions model
@@ -71,12 +78,14 @@ class ReverseMixed(models.Model):
     """
     name = models.CharField(max_length=128, unique=True)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
 
 class LogEntryWithGroup(LogEntry):
-    group = models.ForeignKey('auth.Group', null=True, blank=True)
+    group = models.ForeignKey('auth.Group', null=True, blank=True, on_delete=models.CASCADE)
+
+    objects = models.Manager()
 
 
 class NonIntPKModel(models.Model):

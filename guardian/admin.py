@@ -4,9 +4,6 @@ from __future__ import unicode_literals
 
 from collections import OrderedDict
 
-import django
-from builtins import str
-from builtins import object
 from django import forms
 from django.conf import settings
 from django.template import RequestContext
@@ -32,6 +29,7 @@ from guardian.shortcuts import get_groups_with_perms
 from guardian.shortcuts import get_perms_for_model
 from guardian.models import Group
 from organizations.managers import OrgManager
+import django
 
 
 class AdminUserObjectPermissionsForm(UserObjectPermissionsForm):
@@ -197,15 +195,14 @@ class GuardedModelAdminMixin(object):
             from django.contrib.admin.util import unquote
         obj = get_object_or_404(self.get_queryset(
             request), pk=unquote(object_pk))
-        # users_perms = OrderedDict(
-        #    sorted(
-        #         get_users_with_perms(obj, attach_perms=True,
-        #                              with_group_users=False).items(),
-        #         key=lambda user: getattr(
-        #             user[0], get_user_model().USERNAME_FIELD)
-        #     )
-        # )
-        users_perms = None
+        users_perms = OrderedDict(
+            sorted(
+                get_users_with_perms(obj, attach_perms=True,
+                                     with_group_users=False).items(),
+                key=lambda user: getattr(
+                    user[0], get_user_model().USERNAME_FIELD)
+            )
+        )
 
         groups_perms = OrderedDict(
             sorted(
@@ -221,25 +218,26 @@ class GuardedModelAdminMixin(object):
             )
         )
 
+
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
-            user_form = UserManage(request.POST)
-            group_form = GroupManage()
-            organization_form = OrganizationManage()
+            user_form = self.get_obj_perms_user_select_form(request)(request.POST)
+            group_form = self.get_obj_perms_group_select_form(request)(request.POST)
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
                 get_model_name(self.model)
             )
             if user_form.is_valid():
-                users = user_form.cleaned_data['user']
-                users_perms = OrderedDict()
-                for user in users:
-                    users_perms[user] = sorted(get_perms(user, obj))
-                users_perms.keys().sort(key=lambda user: user.get_full_name())
+                user_id = user_form.cleaned_data['user'].pk
+                url = reverse(
+                    '%s:%s_%s_permissions_manage_user' % info,
+                    args=[obj.pk, user_id]
+                )
+                return redirect(url)
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
-            user_form = UserManage()
-            group_form = GroupManage(request.POST)
-            organization_form = OrganizationManage()
+            user_form = self.get_obj_perms_user_select_form(request)(request.POST)
+            group_form = self.get_obj_perms_group_select_form(request)(request.POST)
+            organization_form = self.get_obj_perms_organization_select_form(request)(request.POST)
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
@@ -253,9 +251,9 @@ class GuardedModelAdminMixin(object):
                 )
                 return redirect(url)
         elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
-            user_form = UserManage()
-            group_form = GroupManage()
-            organization_form = OrganizationManage(request.POST)
+            user_form = self.get_obj_perms_user_select_form(request)(request.POST)
+            group_form = self.get_obj_perms_group_select_form(request)(request.POST)
+            organization_form = self.get_obj_perms_organization_select_form(request)(request.POST)
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
@@ -269,9 +267,9 @@ class GuardedModelAdminMixin(object):
                 )
                 return redirect(url)
         else:
-            user_form = UserManage()
-            group_form = GroupManage()
-            organization_form = OrganizationManage()
+            user_form = self.get_obj_perms_user_select_form(request)()
+            group_form = self.get_obj_perms_group_select_form(request)()
+            organization_form = self.get_obj_perms_organization_select_form(request)()
 
         context = self.get_obj_perms_base_context(request, obj)
         context['users_perms'] = users_perms
@@ -310,7 +308,7 @@ class GuardedModelAdminMixin(object):
 
         user = get_object_or_404(get_user_model(), pk=user_id)
         obj = get_object_or_404(self.get_queryset(request), pk=object_pk)
-        form_class = self.get_obj_perms_manage_user_form()
+        form_class = self.get_obj_perms_manage_user_form(request)
         form = form_class(user, obj, request.POST or None)
 
         if request.method == 'POST' and form.is_valid():
@@ -335,7 +333,10 @@ class GuardedModelAdminMixin(object):
 
         request.current_app = self.admin_site.name
 
-        return render(request, self.get_obj_perms_manage_user_template(), context)
+        if django.VERSION >= (1, 10):
+            return render(request, self.get_obj_perms_manage_user_template(), context)
+
+        return render_to_response(self.get_obj_perms_manage_user_template(), context, RequestContext(request))
 
     def get_obj_perms_manage_user_template(self):
         """
@@ -351,7 +352,29 @@ class GuardedModelAdminMixin(object):
             return 'admin/guardian/contrib/grappelli/obj_perms_manage_user.html'
         return self.obj_perms_manage_user_template
 
-    def get_obj_perms_manage_user_form(self):
+    def get_obj_perms_user_select_form(self, request):
+        """
+        Returns form class for selecting a user for permissions management.  By
+        default :form:`UserManage` is returned.
+        """
+        return UserManage
+
+    def get_obj_perms_group_select_form(self, request):
+        """
+        Returns form class for selecting a group for permissions management.  By
+        default :form:`GroupManage` is returned.
+        """
+        return GroupManage
+
+    def get_obj_perms_organization_select_form(self, request):
+        """
+        Returns form class for selecting a group for permissions management.  By
+        default :form:`OrganizationManage` is returned.
+        """
+        return OrganizationManage
+
+
+    def get_obj_perms_manage_user_form(self, request):
         """
         Returns form class for user object permissions management.  By default
         :form:`AdminUserObjectPermissionsForm` is returned.
@@ -368,7 +391,7 @@ class GuardedModelAdminMixin(object):
 
         group = get_object_or_404(Group, id=group_id)
         obj = get_object_or_404(self.get_queryset(request), pk=object_pk)
-        form_class = self.get_obj_perms_manage_group_form()
+        form_class = self.get_obj_perms_manage_group_form(request)
         form = form_class(group, obj, request.POST or None)
 
         if request.method == 'POST' and form.is_valid():
@@ -393,7 +416,10 @@ class GuardedModelAdminMixin(object):
 
         request.current_app = self.admin_site.name
 
-        return render(request, self.get_obj_perms_manage_group_template(), context)
+        if django.VERSION >= (1, 10):
+            return render(request, self.get_obj_perms_manage_group_template(), context)
+
+        return render_to_response(self.get_obj_perms_manage_group_template(), context, RequestContext(request))
 
     def get_obj_perms_manage_group_template(self):
         """
@@ -409,7 +435,7 @@ class GuardedModelAdminMixin(object):
             return 'admin/guardian/contrib/grappelli/obj_perms_manage_group.html'
         return self.obj_perms_manage_group_template
 
-    def get_obj_perms_manage_group_form(self):
+    def get_obj_perms_manage_group_form(self, request):
         """
         Returns form class for group object permissions management.  By default
         :form:`AdminGroupObjectPermissionsForm` is returned.

@@ -20,6 +20,8 @@ from guardian.models import UserObjectPermission, GroupObjectPermission
 from guardian.shortcuts import assign_perm
 from guardian.management import create_anonymous_user
 
+from guardian.testapp.models import Project
+
 User = get_user_model()
 
 
@@ -40,8 +42,16 @@ class ObjectPermissionTestCase(TestCase):
         self.user.groups.add(self.group)
         self.ctype = ContentType.objects.create(
             model='bar', app_label='fake-for-guardian-tests')
+        self.ctype_qset = ContentType.objects.filter(model='bar',
+                                                     app_label='fake-for-guardian-tests')
         self.anonymous_user = User.objects.get(
             username=guardian_settings.ANONYMOUS_USER_NAME)
+
+    def get_permission(self, codename, app_label=None):
+        qs = Permission.objects
+        if app_label:
+            qs = qs.filter(content_type__app_label=app_label)
+        return Permission.objects.get(codename=codename)
 
 
 class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
@@ -188,18 +198,23 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
             from django.db import connection
 
             ContentType.objects.clear_cache()
-            new_group = Group.objects.create(name='new-group')
+            group1 = Group.objects.create(name='group1')
+            group2 = Group.objects.create(name='group2')
             user = User.objects.create(username='active_user', is_active=True)
             assign_perm("change_group", user, self.group)
-            assign_perm("change_group", user, new_group)
+            assign_perm("change_group", user, group1)
             checker = ObjectPermissionChecker(user)
 
             # Prefetch permissions
-            self.assertTrue(checker.prefetch_perms([self.group, new_group]))
+            prefetched_objects = [self.group, group1, group2]
+            self.assertTrue(checker.prefetch_perms(prefetched_objects))
             query_count = len(connection.queries)
 
             # Checking cache is filled
-            self.assertEqual(len(checker._obj_perms_cache), 2)
+            self.assertEqual(
+                len(checker._obj_perms_cache),
+                len(prefetched_objects)
+            )
 
             # Checking shouldn't spawn any queries
             checker.has_perm("change_group", self.group)
@@ -211,9 +226,14 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
             self.assertEqual(len(connection.queries), query_count)
 
             # Checking for same model but other instance shouldn't spawn any queries
-            checker.has_perm("change_group", new_group)
+            checker.has_perm("change_group", group1)
             self.assertEqual(len(connection.queries), query_count)
 
+            # Checking for same model but other instance shouldn't spawn any queries
+            # Even though User doesn't have perms on Group2, we still should
+            #  not hit DB
+            self.assertFalse(checker.has_perm("change_group", group2))
+            self.assertEqual(len(connection.queries), query_count)
         finally:
             settings.DEBUG = False
 
@@ -223,18 +243,22 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
             from django.db import connection
 
             ContentType.objects.clear_cache()
-            new_group = Group.objects.create(name='new-group')
+            group1 = Group.objects.create(name='group1')
             user = User.objects.create(username='active_superuser',
                                        is_superuser=True, is_active=True)
             assign_perm("change_group", user, self.group)
             checker = ObjectPermissionChecker(user)
 
             # Prefetch permissions
-            self.assertTrue(checker.prefetch_perms([self.group, new_group]))
+            prefetched_objects = [self.group, group1]
+            self.assertTrue(checker.prefetch_perms(prefetched_objects))
             query_count = len(connection.queries)
 
             # Checking cache is filled
-            self.assertEqual(len(checker._obj_perms_cache), 2)
+            self.assertEqual(
+                len(checker._obj_perms_cache),
+                len(prefetched_objects)
+            )
 
             # Checking shouldn't spawn any queries
             checker.has_perm("change_group", self.group)
@@ -246,9 +270,8 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
             self.assertEqual(len(connection.queries), query_count)
 
             # Checking for same model but other instance shouldn't spawn any queries
-            checker.has_perm("change_group", new_group)
+            checker.has_perm("change_group", group1)
             self.assertEqual(len(connection.queries), query_count)
-
         finally:
             settings.DEBUG = False
 
@@ -258,17 +281,23 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
             from django.db import connection
 
             ContentType.objects.clear_cache()
-            new_group = Group.objects.create(name='new-group')
-            assign_perm("change_group", new_group, self.group)
-            assign_perm("change_group", new_group, new_group)
-            checker = ObjectPermissionChecker(new_group)
+            group1 = Group.objects.create(name='group1')
+            group2 = Group.objects.create(name='group2')
+            assign_perm("change_group", group1, self.group)
+            assign_perm("change_group", group1, group1)
+            checker = ObjectPermissionChecker(group1)
 
             # Prefetch permissions
-            self.assertTrue(checker.prefetch_perms([self.group, new_group]))
+            prefetched_objects = [self.group, group1, group2]
+            self.assertTrue(checker.prefetch_perms(prefetched_objects))
+
             query_count = len(connection.queries)
 
             # Checking cache is filled
-            self.assertEqual(len(checker._obj_perms_cache), 2)
+            self.assertEqual(
+                len(checker._obj_perms_cache),
+                len(prefetched_objects)
+            )
 
             # Checking shouldn't spawn any queries
             checker.has_perm("change_group", self.group)
@@ -280,8 +309,139 @@ class ObjectPermissionCheckerTest(ObjectPermissionTestCase):
             self.assertEqual(len(connection.queries), query_count)
 
             # Checking for same model but other instance shouldn't spawn any queries
-            checker.has_perm("change_group", new_group)
+            checker.has_perm("change_group", group1)
             self.assertEqual(len(connection.queries), query_count)
 
+            # Checking for same model but other instance shouldn't spawn any queries
+            # Even though User doesn't have perms on Group2, we still should
+            #  not hit DB
+            self.assertFalse(checker.has_perm("change_group", group2))
+            self.assertEqual(len(connection.queries), query_count)
+        finally:
+            settings.DEBUG = False
+
+    def test_prefetch_user_perms_direct_rel(self):
+        settings.DEBUG = True
+        try:
+            from django.db import connection
+
+            ContentType.objects.clear_cache()
+            user = User.objects.create(username='active_user', is_active=True)
+            projects = \
+                [Project.objects.create(name='Project%s' % i)
+                    for i in range(3)]
+            assign_perm("change_project", user, projects[0])
+            assign_perm("change_project", user, projects[1])
+
+            checker = ObjectPermissionChecker(user)
+
+            # Prefetch permissions
+            self.assertTrue(checker.prefetch_perms(projects))
+            query_count = len(connection.queries)
+
+            # Checking cache is filled
+            self.assertEqual(len(checker._obj_perms_cache), len(projects))
+
+            # Checking shouldn't spawn any queries
+            checker.has_perm("change_project", projects[0])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for other permission but for Group object again
+            # shouldn't spawn any query too
+            checker.has_perm("delete_project", projects[0])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for same model but other instance shouldn't spawn any
+            #  queries
+            checker.has_perm("change_project", projects[1])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for same model but other instance shouldn't spawn any queries
+            # Even though User doesn't have perms on projects[2], we still
+            #  should not hit DB
+            self.assertFalse(checker.has_perm("change_project", projects[2]))
+            self.assertEqual(len(connection.queries), query_count)
+        finally:
+            settings.DEBUG = False
+
+    def test_prefetch_superuser_perms_direct_rel(self):
+        settings.DEBUG = True
+        try:
+            from django.db import connection
+
+            ContentType.objects.clear_cache()
+            user = User.objects.create(
+                username='active_user', is_active=True, is_superuser=True)
+            projects = \
+                [Project.objects.create(name='Project%s' % i)
+                    for i in range(2)]
+            assign_perm("change_project", user, projects[0])
+
+            checker = ObjectPermissionChecker(user)
+
+            # Prefetch permissions
+            self.assertTrue(checker.prefetch_perms(projects))
+            query_count = len(connection.queries)
+
+            # Checking cache is filled
+            self.assertEqual(len(checker._obj_perms_cache), len(projects))
+
+            # Checking shouldn't spawn any queries
+            checker.has_perm("change_project", projects[0])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for other permission but for Group object again
+            # shouldn't spawn any query too
+            checker.has_perm("delete_project", projects[0])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for same model but other instance shouldn't spawn any
+            #  queries
+            checker.has_perm("change_project", projects[1])
+            self.assertEqual(len(connection.queries), query_count)
+        finally:
+            settings.DEBUG = False
+
+    def test_prefetch_group_perms_direct_rel(self):
+        settings.DEBUG = True
+        try:
+            from django.db import connection
+
+            ContentType.objects.clear_cache()
+            group = Group.objects.create(name='new-group')
+            projects = \
+                [Project.objects.create(name='Project%s' % i)
+                    for i in range(3)]
+            assign_perm("change_project", group, projects[0])
+            assign_perm("change_project", group, projects[1])
+
+            checker = ObjectPermissionChecker(group)
+
+            # Prefetch permissions
+            self.assertTrue(checker.prefetch_perms(projects))
+            query_count = len(connection.queries)
+
+            # Checking cache is filled
+            self.assertEqual(len(checker._obj_perms_cache), len(projects))
+
+            # Checking shouldn't spawn any queries
+            checker.has_perm("change_project", projects[0])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for other permission but for Group object again
+            # shouldn't spawn any query too
+            checker.has_perm("delete_project", projects[0])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for same model but other instance shouldn't spawn any
+            #  queries
+            checker.has_perm("change_project", projects[1])
+            self.assertEqual(len(connection.queries), query_count)
+
+            # Checking for same model but other instance shouldn't spawn any queries
+            # Even though User doesn't have perms on projects[2], we still
+            #  should not hit DB
+            self.assertFalse(checker.has_perm("change_project", projects[2]))
+            self.assertEqual(len(connection.queries), query_count)
         finally:
             settings.DEBUG = False

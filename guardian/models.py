@@ -1,29 +1,21 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from __future__ import unicode_literals
-
-from django.db import models
-from django.core.exceptions import ValidationError
-from django.contrib.auth.models import Group
-from organizations.models import Organization
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils.six import python_2_unicode_compatible
+from django.utils.translation import ugettext_lazy as _
+from guardian.compat import unicode, user_model_label
+from guardian.ctypes import get_content_type
+from guardian.managers import GroupObjectPermissionManager, UserObjectPermissionManager
 
 try:
     from django.contrib.contenttypes.fields import GenericForeignKey
 except ImportError:
     from django.contrib.contenttypes.generic import GenericForeignKey
 
-from django.utils.translation import ugettext_lazy as _
 
-from guardian.compat import user_model_label
-from guardian.compat import unicode
-from guardian.managers import GroupObjectPermissionManager, OrganizationObjectPermissionManager
-from guardian.managers import UserObjectPermissionManager
-
-
+@python_2_unicode_compatible
 class BaseObjectPermission(models.Model):
     """
     Abstract ObjectPermission class. Actual class should additionally define
@@ -31,17 +23,17 @@ class BaseObjectPermission(models.Model):
     """
     permission = models.ForeignKey(Permission, on_delete=models.CASCADE)
 
-    class Meta(object):
+    class Meta:
         abstract = True
 
-    def __unicode__(self):
+    def __str__(self):
         return '%s | %s | %s' % (
             unicode(self.content_object),
-            unicode(getattr(self, 'user', False) or self.organization),
+            unicode(getattr(self, 'user', False) or self.group),
             unicode(self.permission.codename))
 
     def save(self, *args, **kwargs):
-        content_type = ContentType.objects.get_for_model(self.content_object)
+        content_type = get_content_type(self.content_object)
         if content_type != self.permission.content_type:
             raise ValidationError("Cannot persist permission not designed for "
                                   "this class (permission's type is %r and object's type is %r)"
@@ -51,13 +43,13 @@ class BaseObjectPermission(models.Model):
 
 class BaseGenericObjectPermission(models.Model):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_pk = models.CharField(_('object ID'), max_length=255, db_index=True)
+    object_pk = models.CharField(_('object ID'), max_length=255)
     content_object = GenericForeignKey(fk_field='object_pk')
     permission_expiry = models.DateTimeField(null=True, blank=True, db_index=True)
     permission_expiry_30day_email_sent = models.BooleanField(null=False, default=False, blank=True, db_index=True)
     permission_expiry_0day_email_sent = models.BooleanField(null=False, default=False, blank=True, db_index=True)
 
-    class Meta(object):
+    class Meta:
         abstract = True
 
 
@@ -69,13 +61,14 @@ class UserObjectPermissionBase(BaseObjectPermission):
 
     objects = UserObjectPermissionManager()
 
-    class Meta(object):
+    class Meta:
         abstract = True
         unique_together = ['user', 'permission', 'content_object']
 
 
 class UserObjectPermission(UserObjectPermissionBase, BaseGenericObjectPermission):
-    class Meta(object):
+
+    class Meta:
         unique_together = ['user', 'permission', 'object_pk']
 
 
@@ -87,40 +80,34 @@ class GroupObjectPermissionBase(BaseObjectPermission):
 
     objects = GroupObjectPermissionManager()
 
-    class Meta(object):
+    class Meta:
         abstract = True
         unique_together = ['group', 'permission', 'content_object']
 
 
 class GroupObjectPermission(GroupObjectPermissionBase, BaseGenericObjectPermission):
-    class Meta(object):
+
+    class Meta:
         unique_together = ['group', 'permission', 'object_pk']
 
 
 class OrganizationObjectPermissionBase(BaseObjectPermission):
     """
-    **Manager**: :manager:`GroupObjectPermissionManager`
+    **Manager**: :manager:`OrganizationObjectPermissionManager`
     """
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
     objects = OrganizationObjectPermissionManager()
 
-    class Meta(object):
+    class Meta:
         abstract = True
         unique_together = ['organization', 'permission', 'content_object']
 
 
 class OrganizationObjectPermission(OrganizationObjectPermissionBase, BaseGenericObjectPermission):
-    class Meta(object):
+    class Meta:
         unique_together = ['organization', 'permission', 'object_pk']
 
-
-# As with Django 1.7, you can't use the get_user_model at this point
-# because the app registry isn't ready yet (we're inside a model file).
-import django
-if django.VERSION < (1, 7) and settings.MONKEY_PATCH:
-    from . import monkey_patch_user
-    monkey_patch_user()
 
 setattr(Group, 'add_obj_perm',
         lambda self, perm, obj: GroupObjectPermission.objects.assign_perm(perm, self, obj))

@@ -1,3 +1,68 @@
+Release 1.4.9 (Jul 01, 2017)
+============================
+
+* Drop ``django_guardian.compat.OrderedDict`` as a consequence of drop Python 1.6
+  earlier.
+* Fix django admin 1.11 not showing selected permissions
+* Add a optional checker variable to get_obj_perms
+* Add missing classifiers in setup.py
+
+
+Release 1.4.8 (Apr 04, 2017)
+============================
+
+* Improved performance of `clean_orphan_obj_perms` management command
+* Use bumpversion for versioning.
+* Enable Python 3.6 testing
+* Python 2.7, 3.4, 3.5, 3.6 are only supported Python versions
+* Django 1.8, 1.10, and 1.11 are only supported Django versions
+* Added explicity on_delete to all ForeignKeys
+
+Release 1.4.6 (Sep 09, 2016)
+============================
+
+* Improved performance of get_objects_for_user
+* Added test-covered and documented guardian.mixins.PermissionListMixin
+* Allow content type retrieval to be overridden fg. for django-polymorphic support
+* Added support CreateView-like (no object) view in PermissionRequiredMixin
+* Added django 1.10 to TravisCI and tox
+* Run tests for example_project in TravisCI
+* Require django 1.9+ for example_project (django-guardian core support django 1.7+)
+* Fix django versions compatibility in example_project
+* Drop django in install_requires of setuptools
+
+Release 1.4.5 (Aug 09, 2016)
+============================
+
+* Fix caching issue with prefetch_perms.
+* Convert readthedocs link for their .org -> .io migration for hosted projects
+* Added example CRUD CBV project
+* Added TEMPLATES in example_project settings
+* Added Queryset support to assign_perm
+* Added QuerySet support to remove_perm
+* Updated assign_perm and remove_perm docstrings
+* Moved queryset support in assign_perms to its own function
+* Moved queryset support in remove_perms to its own function
+* Consolidated {User,Group}ObjectPermissionManager, move logic of bulk_*_perm
+  to managers
+* `assign_perm` and `remove_perm` shortcuts accept `Permission` 
+  instance as `perm` and `QuerySet` as `obj` too.
+* Consolidated bulk_assign_perm to assign_perm and bulk_remove_perm to remove_perm
+* Upgraded Grappelli templates breadcrumbs block to new Django 1.9 and
+  Grappelli 2.8 standards, including proper URLs and support for
+  preserved_filters. Removed the duplicated field.errors in the field.html
+  template file.
+* Made UserManage/GroupManage forms overridable
+* Fixed GuardedModelAdminMixin views render for Django 1.10
+
+
+Release 1.4.4 (Apr 04, 2016)
+============================
+
+* Don't install support example_project.
+* Direct ForeignKey perms in prefetch_perms.
+
+
 Release 1.4.3 (Apr 03, 2016)
 ============================
 
@@ -9,6 +74,7 @@ Release 1.4.3 (Apr 03, 2016)
 * Lookup anonymous user using custom username field.
 * Fix up processing of ANONYMOUS_USER_NAME where set to None. Fixes #409.
 * Require TEMPLATE_403 to exist if RENDER_403 set.
+
 
 Release 1.4.2 (Mar 09, 2016)
 ============================
@@ -31,6 +97,7 @@ Release 1.4.2 (Mar 09, 2016)
 * When using `attach_perms` with `get_users_with_perms`, and `with_group_users`
   and `with_superusers` set to `False`, only directly assigned permissions are
   now returned, and not effective (infered) permissions.
+
 
 Release 1.4.1 (Jan 10, 2016)
 ============================

@@ -11,23 +11,23 @@ import logging
 import os
 from datetime import datetime
 from itertools import chain
-
-import django
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.models import AnonymousUser, Group
-from django.contrib.auth.views import redirect_to_login
-from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Model
-from django.http import HttpResponseForbidden
-from django.shortcuts import render
-from django.utils.timezone import utc
-
-from guardian.compat import get_user_model
+from django.http import HttpResponseForbidden, HttpResponseNotFound
+from django.shortcuts import render_to_response, render
+from django.template import RequestContext
+from guardian.compat import get_user_model, remote_model
 from guardian.conf import settings as guardian_settings
+from guardian.ctypes import get_content_type
 from guardian.exceptions import NotUserNorGroup
-from organizations.models import Organization
+from itertools import chain
+
+import django
+import logging
+import os
 
 logger = logging.getLogger(__name__)
 abspath = lambda *p: os.path.abspath(os.path.join(*p))
@@ -88,8 +88,9 @@ def get_identity(identity):
         "(got %s)" % identity)
 
 
-def get_403_or_None(request, perms, obj=None, login_url=None,
-                    redirect_field_name=None, return_403=False, accept_global_perms=False):
+def get_40x_or_None(request, perms, obj=None, login_url=None,
+                    redirect_field_name=None, return_403=False,
+                    return_404=False, accept_global_perms=False):
     login_url = login_url or settings.LOGIN_URL
     redirect_field_name = redirect_field_name or REDIRECT_FIELD_NAME
 
@@ -108,15 +109,32 @@ def get_403_or_None(request, perms, obj=None, login_url=None,
     if not has_permissions:
         if return_403:
             if guardian_settings.RENDER_403:
-                response = render(request,
-                    guardian_settings.TEMPLATE_403, {}
-                    )
+                if django.VERSION >= (1, 10):
+                    response = render(request, guardian_settings.TEMPLATE_403)
+                else:
+                    response = render_to_response(
+                        guardian_settings.TEMPLATE_403, {},
+                        RequestContext(request))
                 response.status_code = 403
                 return response
             elif guardian_settings.RAISE_403:
                 raise PermissionDenied
             return HttpResponseForbidden()
+        if return_404:
+            if guardian_settings.RENDER_404:
+                if django.VERSION >= (1, 10):
+                    response = render(request, guardian_settings.TEMPLATE_404)
+                else:
+                    response = render_to_response(
+                        guardian_settings.TEMPLATE_404, {},
+                        RequestContext(request))
+                response.status_code = 404
+                return response
+            elif guardian_settings.RAISE_404:
+                raise ObjectDoesNotExist
+            return HttpResponseNotFound()
         else:
+            from django.contrib.auth.views import redirect_to_login
             return redirect_to_login(request.get_full_path(),
                                      login_url,
                                      redirect_field_name)
@@ -136,8 +154,9 @@ def clean_orphan_obj_perms():
 
     deleted = 0
     # TODO: optimise
-    for perm in chain(UserObjectPermission.objects.all(),
-        GroupObjectPermission.objects.all(), OrganizationObjectPermission.objects.all()):
+    for perm in chain(UserObjectPermission.objects.all().iterator(),
+                      GroupObjectPermission.objects.all().iterator(),
+                      OrganizationObjectPermission.objects.all().iterator()):
         if perm.content_object is None:
             logger.debug("Removing %s (pk=%d)" % (perm, perm.pk))
             perm.delete()
@@ -153,7 +172,7 @@ def clean_orphan_obj_perms():
 def get_obj_perms_model(obj, base_cls, generic_cls):
     if isinstance(obj, Model):
         obj = obj.__class__
-    ctype = ContentType.objects.get_for_model(obj)
+    ctype = get_content_type(obj)
 
     if django.VERSION >= (1, 8):
         fields = (f for f in obj._meta.get_fields()
@@ -173,7 +192,7 @@ def get_obj_perms_model(obj, base_cls, generic_cls):
                 # make sure that content_object's content_type is same as
                 # the one of given obj
                 fk = model._meta.get_field('content_object')
-                if ctype == ContentType.objects.get_for_model(fk.rel.to):
+                if ctype == get_content_type(remote_model(fk)):
                     return model
     return generic_cls
 
@@ -194,25 +213,3 @@ def get_group_obj_perms_model(obj):
     from guardian.models import GroupObjectPermissionBase
     from guardian.models import GroupObjectPermission
     return get_obj_perms_model(obj, GroupObjectPermissionBase, GroupObjectPermission)
-
-
-def get_organization_obj_perms_model(obj):
-    """
-    Returns model class that connects given ``obj`` and Group class.
-    """
-    from guardian.models import OrganizationObjectPermissionBase
-    from guardian.models import OrganizationObjectPermission
-    return get_obj_perms_model(obj, OrganizationObjectPermissionBase, OrganizationObjectPermission)
-
-
-def calculate_permission_expiry(perm, renewal_period):
-    if not perm or not renewal_period:
-        return None
-
-    expiry = perm.permission_expiry
-    if expiry is None:
-        return (datetime.utcnow() + renewal_period).replace(tzinfo=utc)
-    elif expiry < datetime.utcnow().replace(tzinfo=utc):
-        return datetime.utcnow().replace(tzinfo=utc) + renewal_period
-    else:
-        return expiry.replace(tzinfo=utc) + renewal_period

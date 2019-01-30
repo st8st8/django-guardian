@@ -16,7 +16,7 @@ Let's assume we have following model:
     class Task(models.Model):
         summary = models.CharField(max_length=32)
         content = models.TextField()
-        reported_by = models.ForeignKey(User)
+        reported_by = models.ForeignKey(User, on_delete=models.CASCADE)
         created_at = models.DateTimeField(auto_now_add=True)
 
 ... and we want to be able to set custom permission *view_task*. We let Django
@@ -28,7 +28,7 @@ model could look like:
     class Task(models.Model):
         summary = models.CharField(max_length=32)
         content = models.TextField()
-        reported_by = models.ForeignKey(User)
+        reported_by = models.ForeignKey(User, on_delete=models.CASCADE)
         created_at = models.DateTimeField(auto_now_add=True)
 
         class Meta:
@@ -36,9 +36,8 @@ model could look like:
                 ('view_task', 'View task'),
             )
 
-After we call ``syncdb`` (with a ``--all`` switch if you are using south)
-management command our *view_task* permission would be added to default set of
-permissions.
+After we call management commands ``makemigrations`` and ``migrate``
+our *view_task* permission would be added to default set of permissions.
 
 .. note::
    By default, Django adds 3 permissions for each registered model:
@@ -128,9 +127,10 @@ Another example:
     >>> userA.has_perm('change_company', companyB)
     False
     >>> userB = User.objects.create(username="User B")
+    >>> userB.groups.add(companyUserGroupB)
     >>> userB.has_perm('change_company', companyA)
     False
-    >>> userA.has_perm('change_company', companyB)
+    >>> userB.has_perm('change_company', companyB)
     True
 
 Assigning Permissions inside Signals

@@ -21,7 +21,7 @@ and hook guardian's authentication backend::
 
 .. note::
    Once project is configured to work with ``django-guardian``, calling
-   ``syncdb`` management command would create ``User`` instance for
+   ``migrate`` management command would create ``User`` instance for
    anonymous user support (with name of ``AnonymousUser``).
 
 .. note::
@@ -127,7 +127,7 @@ GUARDIAN_GET_INIT_ANONYMOUS_USER
 Guardian supports object level permissions for anonymous users, however when
 in our project we use custom User model, default function might fail. This can
 lead to issues as ``guardian`` tries to create anonymous user after each
-``syncdb`` call. Object that is going to be created is retrieved using function
+``migrate`` call. Object that is going to be created is retrieved using function
 pointed by this setting. Once retrieved, ``save`` method would be called on
 that instance.
 
@@ -135,3 +135,21 @@ Defaults to ``"guardian.management.get_init_anonymous_user"``.
 
 
 .. seealso:: :ref:`custom-user-model-anonymous`
+
+GUARDIAN_GET_CONTENT_TYPE
+-------------------------
+
+.. versionadded:: 1.5
+
+Guardian allows applications to supply a custom function to retrieve the
+content type from objects and models. This is useful when a class or class
+hierarchy uses the ``ContentType`` framework in an non-standard way. Most
+applications will not have to change this setting.
+
+As an example, when using ``django-polymorphic`` it's useful to use a
+permission on the base model which applies to all child models. In this case,
+the custom function would return the ``ContentType`` of the base class for
+polymorphic models and the regular model ``ContentType`` for non-polymorphic
+classes.
+
+Defaults to ``"guardian.ctypes.get_default_content_type"``.

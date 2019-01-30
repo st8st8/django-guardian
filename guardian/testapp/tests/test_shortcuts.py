@@ -69,17 +69,42 @@ class AssignPermTest(ObjectPermissionTestCase):
                           user_or_group=self.user)
 
     def test_user_assign_perm(self):
-        assign_perm("change_contenttype", self.user, self.ctype)
+        assign_perm("add_contenttype", self.user, self.ctype)
         assign_perm("change_contenttype", self.group, self.ctype)
+        assign_perm(self.get_permission("delete_contenttype"), self.user, self.ctype)
+        self.assertTrue(self.user.has_perm("add_contenttype", self.ctype))
         self.assertTrue(self.user.has_perm("change_contenttype", self.ctype))
+        self.assertTrue(self.user.has_perm("delete_contenttype", self.ctype))
 
     def test_group_assign_perm(self):
+        assign_perm("add_contenttype", self.group, self.ctype)
         assign_perm("change_contenttype", self.group, self.ctype)
-        assign_perm("delete_contenttype", self.group, self.ctype)
+        assign_perm(self.get_permission("delete_contenttype"), self.group, self.ctype)
 
         check = ObjectPermissionChecker(self.group)
+        self.assertTrue(check.has_perm("add_contenttype", self.ctype))
         self.assertTrue(check.has_perm("change_contenttype", self.ctype))
         self.assertTrue(check.has_perm("delete_contenttype", self.ctype))
+
+    def test_user_assign_perm_queryset(self):
+        assign_perm("add_contenttype", self.user, self.ctype_qset)
+        assign_perm("change_contenttype", self.group, self.ctype_qset)
+        assign_perm(self.get_permission("delete_contenttype"), self.user, self.ctype_qset)
+        for obj in self.ctype_qset:
+            self.assertTrue(self.user.has_perm("add_contenttype", obj))
+            self.assertTrue(self.user.has_perm("change_contenttype", obj))
+            self.assertTrue(self.user.has_perm("delete_contenttype", obj))
+
+    def test_group_assign_perm_queryset(self):
+        assign_perm("add_contenttype", self.group, self.ctype_qset)
+        assign_perm("change_contenttype", self.group, self.ctype_qset)
+        assign_perm(self.get_permission("delete_contenttype"), self.group, self.ctype_qset)
+
+        check = ObjectPermissionChecker(self.group)
+        for obj in self.ctype_qset:
+            self.assertTrue(check.has_perm("add_contenttype", obj))
+            self.assertTrue(check.has_perm("change_contenttype", obj))
+            self.assertTrue(check.has_perm("delete_contenttype", obj))
 
     def test_user_assign_perm_global(self):
         perm = assign_perm("contenttypes.change_contenttype", self.user)
@@ -129,6 +154,28 @@ class RemovePermTest(ObjectPermissionTestCase):
 
         check = ObjectPermissionChecker(self.group)
         self.assertFalse(check.has_perm("change_contenttype", self.ctype))
+
+    def test_user_remove_perm_queryset(self):
+        assign_perm("change_contenttype", self.user, self.ctype_qset)
+        remove_perm("change_contenttype", self.user, self.ctype_qset)
+        for obj in self.ctype_qset:
+            self.assertFalse(self.user.has_perm("change_contenttype", obj))
+
+    def test_user_remove_perm_empty_queryset(self):
+        assign_perm("change_contenttype", self.user, self.ctype_qset)
+        remove_perm("change_contenttype", self.user, self.ctype_qset.none())
+
+        self.assertEquals(list(self.ctype_qset.none()), [])
+        for obj in self.ctype_qset:
+            self.assertTrue(self.user.has_perm("change_contenttype", obj))
+
+    def test_group_remove_perm_queryset(self):
+        assign_perm("change_contenttype", self.group, self.ctype_qset)
+        remove_perm("change_contenttype", self.group, self.ctype_qset)
+
+        check = ObjectPermissionChecker(self.group)
+        for obj in self.ctype_qset:
+            self.assertFalse(check.has_perm("change_contenttype", obj))
 
     def test_user_remove_perm_global(self):
         # assign perm first
@@ -434,6 +481,18 @@ class GetGroupsWithPerms(TestCase):
         remove_perm("change_contenttype", self.group1, self.obj1)
         result = get_groups_with_perms(self.obj1, attach_perms=True)
         self.assertEqual(len(result), 0)
+
+    def test_filter_by_contenttype(self):
+        # Make sure that both objects have same pk.
+        obj = ContentType.objects.create(pk=1042, model='baz', app_label='guardian-tests')
+        group = Group.objects.create(pk=1042, name='group')
+
+        assign_perm("change_group", self.group1, group)
+        assign_perm("change_contenttype", self.group1, obj)
+
+        result = get_groups_with_perms(obj, attach_perms=True)
+        # No group permissions should be included, even though objects have same pk.
+        self.assertEqual(result[self.group1], ["change_contenttype"])
 
     def test_mixed(self):
         assign_perm("change_contenttype", self.group1, self.obj1)

@@ -5,12 +5,7 @@ from __future__ import unicode_literals
 
 from django import forms
 from django.utils.translation import ugettext as _
-
-from guardian.shortcuts import assign_perm, get_perms, get_organization_perms
-from guardian.shortcuts import remove_perm
-from guardian.shortcuts import get_user_perms
-from guardian.shortcuts import get_group_perms
-from guardian.shortcuts import get_perms_for_model
+from guardian.shortcuts import assign_perm, get_group_perms, get_perms_for_model, get_user_perms, remove_perm
 
 
 class BaseObjectPermissionsForm(forms.Form):
@@ -40,7 +35,7 @@ class BaseObjectPermissionsForm(forms.Form):
         field = field_class(
             label=self.get_obj_perms_field_label(),
             choices=self.get_obj_perms_field_choices(),
-            initial=self.get_obj_perms_field_initial(),
+            initial=list(self.get_obj_perms_field_initial()),
             widget=self.get_obj_perms_field_widget(),
             required=self.are_obj_perms_required(),
         )
@@ -131,7 +126,7 @@ class UserObjectPermissionsForm(BaseObjectPermissionsForm):
         super(UserObjectPermissionsForm, self).__init__(*args, **kwargs)
 
     def get_obj_perms_field_initial(self):
-        perms = get_perms(self.user, self.obj)
+        perms = get_user_perms(self.user, self.obj)
         return perms
 
     def save_obj_perms(self):
@@ -141,14 +136,15 @@ class UserObjectPermissionsForm(BaseObjectPermissionsForm):
 
         Should be called *after* form is validated.
         """
-        perms = self.cleaned_data[self.get_obj_perms_field_name()]
-        model_perms = [c[0] for c in self.get_obj_perms_field_choices()]
+        perms = set(self.cleaned_data[self.get_obj_perms_field_name()])
+        model_perms = set([c[0] for c in self.get_obj_perms_field_choices()])
+        init_perms = set(self.get_obj_perms_field_initial())
 
-        to_remove = set(model_perms) - set(perms)
+        to_remove = (model_perms - perms) & init_perms
         for perm in to_remove:
             remove_perm(perm, self.user, self.obj)
 
-        for perm in perms:
+        for perm in perms - init_perms:
             assign_perm(perm, self.user, self.obj)
 
 
@@ -188,14 +184,15 @@ class GroupObjectPermissionsForm(BaseObjectPermissionsForm):
 
         Should be called *after* form is validated.
         """
-        perms = self.cleaned_data[self.get_obj_perms_field_name()]
-        model_perms = [c[0] for c in self.get_obj_perms_field_choices()]
+        perms = set(self.cleaned_data[self.get_obj_perms_field_name()])
+        model_perms = set([c[0] for c in self.get_obj_perms_field_choices()])
+        init_perms = set(self.get_obj_perms_field_initial())
 
-        to_remove = set(model_perms) - set(perms)
+        to_remove = (model_perms - perms) & init_perms
         for perm in to_remove:
             remove_perm(perm, self.group, self.obj)
 
-        for perm in perms:
+        for perm in perms - init_perms:
             assign_perm(perm, self.group, self.obj)
 
 
@@ -235,12 +232,13 @@ class OrganizationObjectPermissionsForm(BaseObjectPermissionsForm):
 
         Should be called *after* form is validated.
         """
-        perms = self.cleaned_data[self.get_obj_perms_field_name()]
-        model_perms = [c[0] for c in self.get_obj_perms_field_choices()]
+        perms = set(self.cleaned_data[self.get_obj_perms_field_name()])
+        model_perms = set([c[0] for c in self.get_obj_perms_field_choices()])
+        init_perms = set(self.get_obj_perms_field_initial())
 
-        to_remove = set(model_perms) - set(perms)
+        to_remove = (model_perms - perms) & init_perms
         for perm in to_remove:
             remove_perm(perm, self.organization, self.obj)
 
-        for perm in perms:
+        for perm in perms - init_perms:
             assign_perm(perm, self.organization, self.obj)

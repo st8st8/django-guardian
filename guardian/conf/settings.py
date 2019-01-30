@@ -15,10 +15,15 @@ except AttributeError:
 RENDER_403 = getattr(settings, 'GUARDIAN_RENDER_403', False)
 TEMPLATE_403 = getattr(settings, 'GUARDIAN_TEMPLATE_403', '403.html')
 RAISE_403 = getattr(settings, 'GUARDIAN_RAISE_403', False)
+RENDER_404 = getattr(settings, 'GUARDIAN_RENDER_404', False)
+TEMPLATE_404 = getattr(settings, 'GUARDIAN_TEMPLATE_404', '404.html')
+RAISE_404 = getattr(settings, 'GUARDIAN_RAISE_404', False)
 GET_INIT_ANONYMOUS_USER = getattr(settings, 'GUARDIAN_GET_INIT_ANONYMOUS_USER',
                                   'guardian.management.get_init_anonymous_user')
 
 MONKEY_PATCH = getattr(settings, 'GUARDIAN_MONKEY_PATCH', True)
+
+GET_CONTENT_TYPE = getattr(settings, 'GUARDIAN_GET_CONTENT_TYPE', 'guardian.ctypes.get_default_content_type')
 
 
 def check_configuration():

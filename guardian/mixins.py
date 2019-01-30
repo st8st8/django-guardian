@@ -1,18 +1,12 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from __future__ import unicode_literals
-
 from collections import Iterable
 from django.conf import settings
-from django.contrib.auth.decorators import REDIRECT_FIELD_NAME
-from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ImproperlyConfigured
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required, REDIRECT_FIELD_NAME
+from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from guardian.compat import basestring
 from guardian.models import UserObjectPermission
-from guardian.utils import get_403_or_None
-from guardian.utils import get_anonymous_user
+from guardian.utils import get_40x_or_None, get_anonymous_user
+from guardian.shortcuts import get_objects_for_user
 
 
 class LoginRequiredMixin(object):
@@ -109,6 +103,11 @@ class PermissionRequiredMixin(object):
         *Default*: ``False``. Returns 403 error page instead of redirecting
         user.
 
+    ``PermissionRequiredMixin.return_404``
+
+        *Default*: ``False``. Returns 404 error page instead of redirecting
+        user.
+
     ``PermissionRequiredMixin.raise_exception``
 
         *Default*: ``False``
@@ -123,7 +122,7 @@ class PermissionRequiredMixin(object):
          proceed to check object level permissions.
 
     ``PermissionRequiredMixin.permission_object``
-         *Default*: ``None``, object against which test the permission; if None fallback
+         *Default*: ``(not set)``, object against which test the permission; if not set fallback
          to ``self.get_permission_object()`` which return ``self.get_object()``
          or ``self.object`` by default.
 
@@ -133,9 +132,9 @@ class PermissionRequiredMixin(object):
     permission_required = None
     redirect_field_name = REDIRECT_FIELD_NAME
     return_403 = False
+    return_404 = False
     raise_exception = False
     accept_global_perms = False
-    permission_object = None
 
     def get_required_permissions(self, request=None):
         """
@@ -157,10 +156,10 @@ class PermissionRequiredMixin(object):
         return perms
 
     def get_permission_object(self):
-        if self.permission_object:
+        if hasattr(self, 'permission_object'):
             return self.permission_object
-        return (hasattr(self, 'get_object') and self.get_object()
-                or getattr(self, 'object', None))
+        return (hasattr(self, 'get_object') and self.get_object() or
+                getattr(self, 'object', None))
 
     def check_permissions(self, request):
         """
@@ -171,14 +170,14 @@ class PermissionRequiredMixin(object):
         """
         obj = self.get_permission_object()
 
-
-        forbidden = get_403_or_None(request,
+        forbidden = get_40x_or_None(request,
                                     perms=self.get_required_permissions(
                                         request),
                                     obj=obj,
                                     login_url=self.login_url,
                                     redirect_field_name=self.redirect_field_name,
                                     return_403=self.return_403,
+                                    return_404=self.return_404,
                                     accept_global_perms=self.accept_global_perms
                                     )
         if forbidden:
@@ -220,3 +219,72 @@ class GuardianUserMixin(object):
 
     def del_obj_perm(self, perm, obj):
         return UserObjectPermission.objects.remove_perm(perm, self, obj)
+
+
+class PermissionListMixin(object):
+    """
+    A view mixin that filter object in queryset for the current logged by required permission.
+
+    **Example Usage**::
+
+        class SecureView(PermissionListMixin, ListView):
+            ...
+            permission_required = 'articles.view_article'
+            ...
+
+    or::
+
+        class SecureView(PermissionListMixin, ListView):
+            ...
+            permission_required = 'auth.change_user'
+            get_objects_for_user_extra_kwargs = {'use_groups': False}
+            ...
+
+    **Class Settings**
+
+    ``PermissionListMixin.permission_required``
+
+        *Default*: ``None``, must be set to either a string or list of strings
+        in format: *<app_label>.<permission_codename>*.
+
+    ``PermissionListMixin.get_objects_for_user_extra_kwargs``
+
+        *Default*: ``{}``,  A extra params to pass for ```guardian.shorcuts.get_objects_for_user```
+
+    """
+    permission_required = None
+    get_objects_for_user_extra_kwargs = {}
+
+    def get_required_permissions(self, request=None):
+        """
+        Returns list of permissions in format *<app_label>.<codename>* that
+        should be checked against *request.user* and *object*. By default, it
+        returns list from ``permission_required`` attribute.
+
+        :param request: Original request.
+        """
+        if isinstance(self.permission_required, basestring):
+            perms = [self.permission_required]
+        elif isinstance(self.permission_required, Iterable):
+            perms = [p for p in self.permission_required]
+        else:
+            raise ImproperlyConfigured("'PermissionRequiredMixin' requires "
+                                       "'permission_required' attribute to be set to "
+                                       "'<app_label>.<permission codename>' but is set to '%s' instead"
+                                       % self.permission_required)
+        return perms
+
+    def get_get_objects_for_user_kwargs(self, queryset):
+        """
+        Returns dict of kwargs that should be pass to ```get_objects_for_user```.
+
+        :param request: Queryset to filter
+        """
+        return dict(user=self.request.user,
+                    perms=self.get_required_permissions(self.request),
+                    klass=queryset,
+                    **self.get_objects_for_user_extra_kwargs)
+
+    def get_queryset(self, *args, **kwargs):
+        qs = super(PermissionListMixin, self).get_queryset(*args, **kwargs)
+        return get_objects_for_user(**self.get_get_objects_for_user_kwargs(qs))

@@ -5,13 +5,13 @@ from django import forms
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.contenttypes.models import ContentType
-from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 from django.test import TestCase
 from django.test.client import Client
 
 from guardian.admin import GuardedModelAdmin
 from guardian.compat import get_user_model, get_model_name
+from guardian.compat import reverse
 from guardian.compat import str
 from guardian.shortcuts import get_perms
 from guardian.shortcuts import get_perms_for_model
@@ -162,7 +162,7 @@ class AdminTests(TestCase):
         response = self.client.post(url, data, follow=True)
         self.assertEqual(len(response.redirect_chain), 1)
         self.assertEqual(response.redirect_chain[0][1], 302)
-
+        self.assertIn('selected', str(response.context['form']))
         self.assertEqual(
             set(get_perms(self.user, self.obj)),
             set(perms),
@@ -320,7 +320,12 @@ class GuardedModelAdminTests(TestCase):
     def test_obj_perms_manage_user_form_attr(self):
         attrs = {'obj_perms_manage_user_form': forms.Form}
         gma = self._get_gma(attrs=attrs)
-        self.assertTrue(gma.get_obj_perms_manage_user_form(), forms.Form)
+        self.assertTrue(issubclass(gma.get_obj_perms_manage_user_form(None), forms.Form))
+
+    def test_obj_perms_user_select_form_attr(self):
+        attrs = {'obj_perms_user_select_form': forms.Form}
+        gma = self._get_gma(attrs=attrs)
+        self.assertTrue(issubclass(gma.get_obj_perms_user_select_form(None), forms.Form))
 
     def test_obj_perms_manage_group_template_attr(self):
         attrs = {'obj_perms_manage_group_template': 'foobar.html'}
@@ -331,7 +336,12 @@ class GuardedModelAdminTests(TestCase):
     def test_obj_perms_manage_group_form_attr(self):
         attrs = {'obj_perms_manage_group_form': forms.Form}
         gma = self._get_gma(attrs=attrs)
-        self.assertTrue(gma.get_obj_perms_manage_group_form(), forms.Form)
+        self.assertTrue(issubclass(gma.get_obj_perms_manage_group_form(None), forms.Form))
+
+    def test_obj_perms_group_select_form_attr(self):
+        attrs = {'obj_perms_group_select_form': forms.Form}
+        gma = self._get_gma(attrs=attrs)
+        self.assertTrue(issubclass(gma.get_obj_perms_group_select_form(None), forms.Form))
 
     def test_user_can_acces_owned_objects_only(self):
         attrs = {
