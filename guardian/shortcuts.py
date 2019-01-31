@@ -126,7 +126,7 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
         model = get_group_obj_perms_model(obj)
         return model.objects.assign_perm(perm, group, obj, renewal_period, subscribe_to_emails)
     if organization:
-        model = get_organization_obj_perms_model(obj, renewal_period, subscribe_to_emails)
+        model = get_organization_obj_perms_model(obj)
         return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
 
 

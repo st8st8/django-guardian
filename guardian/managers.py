@@ -17,7 +17,14 @@ class BaseObjectPermissionManager(models.Manager):
             self.model._meta.get_field('user')
             return 'user'
         except models.fields.FieldDoesNotExist:
+            pass
+
+        try:
+            self.model._meta.get_field('group')
             return 'group'
+        except models.fields.FieldDoesNotExist:
+            pass
+        return 'organization'
 
     def is_generic(self):
         try:
