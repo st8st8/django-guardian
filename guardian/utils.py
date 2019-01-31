@@ -11,6 +11,8 @@ import logging
 import os
 from datetime import datetime
 from itertools import chain
+
+import django
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME
 from django.contrib.auth.models import AnonymousUser, Group
@@ -19,15 +21,13 @@ from django.db.models import Model
 from django.http import HttpResponseForbidden, HttpResponseNotFound
 from django.shortcuts import render_to_response, render
 from django.template import RequestContext
-from guardian.compat import get_user_model, remote_model
+from pytz import utc
+
+from guardian.compat import get_user_model
 from guardian.conf import settings as guardian_settings
 from guardian.ctypes import get_content_type
 from guardian.exceptions import NotUserNorGroup
-from itertools import chain
-
-import django
-import logging
-import os
+from organizations.models import Organization
 
 logger = logging.getLogger(__name__)
 abspath = lambda *p: os.path.abspath(os.path.join(*p))
@@ -192,7 +192,7 @@ def get_obj_perms_model(obj, base_cls, generic_cls):
                 # make sure that content_object's content_type is same as
                 # the one of given obj
                 fk = model._meta.get_field('content_object')
-                if ctype == get_content_type(remote_model(fk)):
+                if ctype == get_content_type(fk.remote_field.model):
                     return model
     return generic_cls
 
@@ -213,3 +213,25 @@ def get_group_obj_perms_model(obj):
     from guardian.models import GroupObjectPermissionBase
     from guardian.models import GroupObjectPermission
     return get_obj_perms_model(obj, GroupObjectPermissionBase, GroupObjectPermission)
+
+
+def get_organization_obj_perms_model(obj):
+    """
+    Returns model class that connects given ``obj`` and Group class.
+    """
+    from guardian.models import OrganizationObjectPermissionBase
+    from guardian.models import OrganizationObjectPermission
+    return get_obj_perms_model(obj, OrganizationObjectPermissionBase, OrganizationObjectPermission)
+
+
+def calculate_permission_expiry(perm, renewal_period):
+    if not perm or not renewal_period:
+        return None
+
+    expiry = perm.permission_expiry
+    if expiry is None:
+        return (datetime.utcnow() + renewal_period).replace(tzinfo=utc)
+    elif expiry < datetime.utcnow().replace(tzinfo=utc):
+        return datetime.utcnow().replace(tzinfo=utc) + renewal_period
+    else:
+        return expiry.replace(tzinfo=utc) + renewal_period

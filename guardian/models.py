@@ -7,7 +7,9 @@ from django.utils.six import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 from guardian.compat import unicode, user_model_label
 from guardian.ctypes import get_content_type
-from guardian.managers import GroupObjectPermissionManager, UserObjectPermissionManager
+from guardian.managers import GroupObjectPermissionManager, UserObjectPermissionManager, \
+    OrganizationObjectPermissionManager
+from organizations.models import Organization
 
 try:
     from django.contrib.contenttypes.fields import GenericForeignKey
@@ -29,7 +31,7 @@ class BaseObjectPermission(models.Model):
     def __str__(self):
         return '%s | %s | %s' % (
             unicode(self.content_object),
-            unicode(getattr(self, 'user', False) or self.group),
+            unicode(getattr(self, 'user', False) or self.organization),
             unicode(self.permission.codename))
 
     def save(self, *args, **kwargs):

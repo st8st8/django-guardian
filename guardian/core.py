@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from datetime import datetime
+
 from django.contrib.auth.models import Permission
 from django.db.models.query import QuerySet
 from django.utils.encoding import force_text
@@ -9,7 +11,8 @@ from django.db.models import Q
 from django.utils.timezone import utc
 from guardian.compat import get_user_model
 from guardian.ctypes import get_content_type
-from guardian.utils import get_group_obj_perms_model, get_identity, get_user_obj_perms_model
+from guardian.utils import get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
+    get_organization_obj_perms_model
 from itertools import chain
 
 
@@ -21,6 +24,7 @@ def _get_pks_model_and_ctype(objects):
     Assumes that all objects are of the same content type.
     """
 
+    ctype = None
     if isinstance(objects, QuerySet):
         model = objects.model
         pks = [force_text(pk) for pk in objects.values_list('pk', flat=True)]
@@ -180,7 +184,7 @@ class ObjectPermissionChecker(object):
         return group_perms
 
     def get_organization_perms(self, obj, permission_expiry=False):
-        ctype = ContentType.objects.get_for_model(obj)
+        ctype = get_content_type(obj)
 
         perms_qs = Permission.objects.filter(content_type=ctype)
         organization_filters, org_q = self.get_organization_filters(obj, permission_expiry)
@@ -199,7 +203,7 @@ class ObjectPermissionChecker(object):
         if self.user and not self.user.is_active:
             return []
         ctype = get_content_type(obj)
-        key = self.get_local_cache_key(obj)
+        key = self.get_local_cache_key(obj, include_group_perms, permission_expiry)
         if key not in self._obj_perms_cache:
             if self.user and self.user.is_superuser:
                 perms = list(chain(*Permission.objects

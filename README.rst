@@ -2,6 +2,9 @@
 django-guardian
 ===============
 
+This fork of Django guardian integrates with Django Organizations: https://github.com/bennylope/django-organizations
+Also allows permissions to expires after a certain amount of time.
+
 .. image:: https://travis-ci.org/django-guardian/django-guardian.svg?branch=devel
   :target: https://travis-ci.org/django-guardian/django-guardian
 

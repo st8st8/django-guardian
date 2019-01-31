@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 
 import warnings
 from collections import defaultdict
-from itertools import groupby
+from django.core.cache import cache
 
 from django.apps import apps
 from django.contrib.auth.models import Group, Permission
@@ -14,12 +14,15 @@ from django.db.models import Count, Q, QuerySet
 from django.shortcuts import _get_queryset
 from itertools import groupby
 
-from guardian.compat import basestring, get_user_model, is_anonymous
+from pytz import utc
+
+from guardian.compat import basestring, get_user_model
 from guardian.core import ObjectPermissionChecker
 from guardian.ctypes import get_content_type
 from guardian.exceptions import MixedContentTypeError, WrongAppError
 from guardian.models import GroupObjectPermission
-from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model
+from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
+    get_organization_obj_perms_model
 
 from organizations import models as organization_models
 from datetime import datetime
@@ -41,6 +44,12 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
     :param obj: persisted Django's ``Model`` instance or QuerySet of Django
       ``Model`` instances or ``None`` if assigning global permission.
       Default is ``None``.
+
+    :param renewal_period: How long the assigned permission should last
+
+    :param subscribe_to_emails: Should guardian send notifications to user when
+        permissions are close to expiry?
+
 
     We can assign permission for ``Model`` instance for specific user:
 
@@ -107,8 +116,8 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
             model = get_group_obj_perms_model(obj.model)
             return model.objects.assign_perm(perm, group, obj.model, renewal_period, subscribe_to_emails)
         if organization:
-	    model = get_organization_obj_perms_model(obj.model)
-	    return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
+            model = get_organization_obj_perms_model(obj.model)
+            return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
 
     if user:
         model = get_user_obj_perms_model(obj)
@@ -242,69 +251,56 @@ def get_perms_for_model(cls):
     return Permission.objects.filter(content_type=ctype)
 
 
-def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
-                         with_group_users=True, permission_expiry=False):
-    """
-    Returns queryset of all ``User`` objects with *any* object permissions for
-    the given ``obj``.
+def get_unattached_users_with_perms_qset(obj, perm, permission_expiry=False, with_group_users=True, with_superusers=False):
+    # It's much easier without attached perms so we do it first if that is
+    # the case
 
-    :param obj: persisted Django's ``Model`` instance
-
-    :param attach_perms: Default: ``False``. If set to ``True`` result would be
-      dictionary of ``User`` instances with permissions' codenames list as
-      values. This would fetch users eagerly!
-
-    :param with_superusers: Default: ``False``. If set to ``True`` result would
-      contain all superusers.
-
-    :param with_group_users: Default: ``True``. If set to ``False`` result would
-      **not** contain those users who have only group permissions for given
-      ``obj``.
-
-    Example::
-
-        >>> from django.contrib.flatpages.models import FlatPage
-        >>> from django.contrib.auth.models import User
-        >>> from guardian.shortcuts import assign_perm, get_users_with_perms
-        >>>
-        >>> page = FlatPage.objects.create(title='Some page', path='/some/page/')
-        >>> joe = User.objects.create_user('joe', 'joe@example.com', 'joesecret')
-        >>> assign_perm('change_flatpage', joe, page)
-        >>>
-        >>> get_users_with_perms(page)
-        [<User: joe>]
-        >>>
-        >>> get_users_with_perms(page, attach_perms=True)
-        {<User: joe>: [u'change_flatpage']}
-
-    """
+    # JOINing into the perms table is a no-go - would have to be done three times, for users, groups and orgs.
+    # Getting perm id first allows us to forgo this JOIN
+    perm_id = None
+    if perm:
+        perm_id = cache.get("permission_id_{0}".format(perm))
+        if not perm_id:
+            perm_id = Permission.objects.get(codename=perm).id
+            cache.set("permission_id_{0}".format(perm), perm_id, 86400)
     ctype = get_content_type(obj)
-    if not attach_perms:
-        # It's much easier without attached perms so we do it first if that is
-        # the case
-        user_model = get_user_obj_perms_model(obj)
-        related_name = user_model.user.field.related_query_name()
-        if user_model.objects.is_generic():
-            user_filters = {
-                '%s__content_type' % related_name: ctype,
-                '%s__object_pk' % related_name: obj.pk,
+    user_model = get_user_obj_perms_model(obj)
+    related_name = user_model.user.field.related_query_name()
+    if user_model.objects.is_generic():
+        user_filters = {
+            '%s__content_type' % related_name: ctype,
+            '%s__object_pk' % related_name: obj.pk,
+        }
+        if perm_id:
+            user_filters.update({
+                '%s__permission_id' % related_name: perm_id,
+            })
+    else:
+        user_filters = {'%s__content_object' % related_name: obj}
+    qset = Q(**user_filters)
+
+    if permission_expiry:
+        kwargs1 = {"%s__permission_expiry" % related_name: None}
+        kwargs2 = {"%s__permission_expiry__gte" % related_name: datetime.utcnow().replace(tzinfo=utc)}
+        qset &= (Q(**kwargs1) | Q(**kwargs2))
+
+    if with_group_users:
+        group_model = get_group_obj_perms_model(obj)
+        group_rel_name = group_model.group.field.related_query_name()
+        if group_model.objects.is_generic():
+            group_filters = {
+                'groups__%s__content_type' % group_rel_name: ctype,
+                'groups__%s__object_pk' % group_rel_name: obj.pk,
             }
+            if perm_id:
+                group_filters.update({
+                    'groups__%s__permission_id' % group_rel_name: perm_id,
+                })
         else:
-            user_filters = {'%s__content_object' % related_name: obj}
-        qset = Q(**user_filters)
-        if with_group_users:
-            group_model = get_group_obj_perms_model(obj)
-            group_rel_name = group_model.group.field.related_query_name()
-            if group_model.objects.is_generic():
-                group_filters = {
-                    'groups__%s__content_type' % group_rel_name: ctype,
-                    'groups__%s__object_pk' % group_rel_name: obj.pk,
-                }
-            else:
-                group_filters = {
-                    'groups__%s__content_object' % group_rel_name: obj,
-                }
-            qset = qset | Q(**group_filters)
+            group_filters = {
+                'groups__%s__content_object' % group_rel_name: obj,
+            }
+        qset = qset | Q(**group_filters)
 
         org_model = get_organization_obj_perms_model(obj)
         organization_rel_name = org_model.organization.field.related_query_name()
@@ -328,24 +324,83 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
             qset &= (Q(**kwargs1) | Q(**kwargs2))
 
         qset = qset | Q(**organization_filters)
+    if with_superusers:
+        qset = qset | Q(is_superuser=True)
+    return qset
 
-        if with_superusers:
-            qset = qset | Q(is_superuser=True)
-        return get_user_model().objects.filter(qset).distinct()
+
+def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
+                         with_group_users=True, permission_expiry=False):
+        """
+        Returns queryset of all ``User`` objects with *any* object permissions for
+        the given ``obj``.
+
+        :param obj: persisted Django's ``Model`` instance
+
+        :param attach_perms: Default: ``False``. If set to ``True`` result would be
+          dictionary of ``User`` instances with permissions' codenames list as
+          values. This would fetch users eagerly!
+
+        :param with_superusers: Default: ``False``. If set to ``True`` result would
+          contain all superusers.
+
+        :param with_group_users: Default: ``True``. If set to ``False`` result would
+          **not** contain those users who have only group permissions for given
+          ``obj``.
+
+        Example::
+
+            >>> from django.contrib.flatpages.models import FlatPage
+            >>> from django.contrib.auth.models import User
+            >>> from guardian.shortcuts import assign_perm, get_users_with_perms
+            >>>
+            >>> page = FlatPage.objects.create(title='Some page', path='/some/page/')
+            >>> joe = User.objects.create_user('joe', 'joe@example.com', 'joesecret')
+            >>> assign_perm('change_flatpage', joe, page)
+            >>>
+            >>> get_users_with_perms(page)
+            [<User: joe>]
+            >>>
+            >>> get_users_with_perms(page, attach_perms=True)
+            {<User: joe>: [u'change_flatpage']}
+
+        """
+        if not attach_perms:
+            qset = get_unattached_users_with_perms_qset(obj, None,
+                                                        with_group_users=with_group_users,
+                                                        with_superusers=with_superusers,
+                                                        permission_expiry=permission_expiry
+                                                        )
+            return get_user_model().objects.filter(qset).distinct()
+        else:
+            # TODO: Do not hit db for each user!
+            users = {}
+            for user in get_users_with_perms(obj,
+                                             with_group_users=with_group_users,
+                                             with_superusers=with_superusers,
+                                             permission_expiry=permission_expiry):
+                # TODO: Support the case of set with_group_users but not with_superusers.
+                if with_group_users or with_superusers:
+                    users[user] = sorted(get_perms(user, obj))
+                else:
+                    users[user] = sorted(get_user_perms(user, obj))
+            return users
+
+
+def get_users_with_permission(obj, perm, attach_perms=False, with_superusers=False,
+                         with_group_users=True, permission_expiry=False):
+    qset = get_unattached_users_with_perms_qset(obj, perm,
+         with_group_users=with_group_users,
+         with_superusers=with_superusers,
+         permission_expiry=permission_expiry
+    )
+    if not attach_perms:
+        user_model = get_user_obj_perms_model(obj)
+        related_name = user_model.user.field.related_query_name()
+        ret = get_user_model().objects.filter(qset).distinct()
+        return ret
     else:
-        # TODO: Do not hit db for each user!
-        users = {}
-        for user in get_users_with_perms(obj,
-                                         with_group_users=with_group_users,
-                                         with_superusers=with_superusers,
-                                         permission_expiry=permission_expiry):
-            # TODO: Support the case of set with_group_users but not with_superusers.
-            if with_group_users or with_superusers:
-                users[user] = sorted(get_perms(user, obj))
-            else:
-                users[user] = sorted(get_user_perms(user, obj))
-        return users
-
+        raise NotImplementedError
 
 def get_groups_with_perms(obj, attach_perms=False):
     """
@@ -581,7 +636,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     # Check if the user is anonymous. The
     # django.contrib.auth.models.AnonymousUser object doesn't work for queries
     # and it's nice to be able to pass in request.user blindly.
-    if is_anonymous(user):
+    if user.is_anonymous:
         user = get_anonymous_user()
 
     global_perms = set()
@@ -616,6 +671,13 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
     user_obj_perms_queryset = (user_model.objects
                                .filter(user=user)
                                .filter(permission__content_type=ctype))
+    groups_obj_perms_queryset = None
+    organizations_obj_perms_queryset = None
+    group_fields = None
+    organization_fields = None
+    organization_model = None
+    group_model = None
+
     if len(codenames):
         user_obj_perms_queryset = user_obj_perms_queryset.filter(
             permission__codename__in=codenames)
@@ -687,7 +749,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             values = set(values)
         q |= Q(pk__in=values)
 
-        values = organizations_obj_perms_queryset.values_list(group_fields[0], flat=True)
+        values = organizations_obj_perms_queryset.values_list(organization_fields[0], flat=True)
         if organization_model.objects.is_generic():
             values = list(values)
         q |= Q(pk__in=values)
@@ -839,3 +901,128 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
     if group_model.objects.is_generic():
         values = list(values)
     return queryset.filter(pk__in=values)
+
+
+def get_objects_for_organization(organization, perms, klass=None, any_perm=False, accept_global_perms=True):
+    """
+    Returns queryset of objects for which a given ``organization`` has *all*
+    permissions present at ``perms``.
+
+    :param organization: ``organization`` instance for which objects would be returned.
+    :param perms: single permission string, or sequence of permission strings
+      which should be checked.
+      If ``klass`` parameter is not given, those should be full permission
+      names rather than only codenames (i.e. ``auth.change_user``). If more than
+      one permission is present within sequence, their content type **must** be
+      the same or ``MixedContentTypeError`` exception would be raised.
+    :param klass: may be a Model, Manager or QuerySet object. If not given
+      this parameter would be computed based on given ``params``.
+    :param any_perm: if True, any of permission in sequence is accepted
+
+    :raises MixedContentTypeError: when computed content type for ``perms``
+      and/or ``klass`` clashes.
+    :raises WrongAppError: if cannot compute app label for given ``perms``/
+      ``klass``.
+
+    Example:
+
+    Let's assume we have a ``Task`` model belonging to the ``tasker`` app with
+    the default add_task, change_task and delete_task permissions provided
+    by Django::
+
+        >>> from guardian.shortcuts import get_objects_for_organization
+        >>> from tasker import Task
+        >>> organization = organization.objects.create('some organization')
+        >>> task = Task.objects.create('some task')
+        >>> get_objects_for_organization(organization, 'tasker.add_task')
+        []
+        >>> from guardian.shortcuts import assign_perm
+        >>> assign_perm('tasker.add_task', organization, task)
+        >>> get_objects_for_organization(organization, 'tasker.add_task')
+        [<Task some task>]
+
+    The permission string can also be an iterable. Continuing with the previous example:
+        >>> get_objects_for_organization(organization, ['tasker.add_task', 'tasker.delete_task'])
+        []
+        >>> assign_perm('tasker.delete_task', organization, task)
+        >>> get_objects_for_organization(organization, ['tasker.add_task', 'tasker.delete_task'])
+        [<Task some task>]
+
+    """
+    if isinstance(perms, basestring):
+        perms = [perms]
+    ctype = None
+    app_label = None
+    codenames = set()
+
+    # Compute codenames set and ctype if possible
+    for perm in perms:
+        if '.' in perm:
+            new_app_label, codename = perm.split('.', 1)
+            if app_label is not None and app_label != new_app_label:
+                raise MixedContentTypeError("Given perms must have same app "
+                                            "label (%s != %s)" % (app_label, new_app_label))
+            else:
+                app_label = new_app_label
+        else:
+            codename = perm
+        codenames.add(codename)
+        if app_label is not None:
+            new_ctype = ContentType.objects.get(app_label=app_label,
+                                                permission__codename=codename)
+            if ctype is not None and ctype != new_ctype:
+                raise MixedContentTypeError("ContentType was once computed "
+                                            "to be %s and another one %s" % (ctype, new_ctype))
+            else:
+                ctype = new_ctype
+
+    # Compute queryset and ctype if still missing
+    if ctype is None and klass is not None:
+        queryset = _get_queryset(klass)
+        ctype = ContentType.objects.get_for_model(queryset.model)
+    elif ctype is not None and klass is None:
+        queryset = _get_queryset(ctype.model_class())
+    elif klass is None:
+        raise WrongAppError("Cannot determine content type")
+    else:
+        queryset = _get_queryset(klass)
+        if ctype.model_class() != queryset.model:
+            raise MixedContentTypeError("Content type for given perms and "
+                                        "klass differs")
+
+    # At this point, we should have both ctype and queryset and they should
+    # match which means: ctype.model_class() == queryset.model
+    # we should also have ``codenames`` list
+
+    # Now we should extract list of pk values for which we would filter queryset
+    organization_model = get_organization_obj_perms_model(queryset.model)
+    organizations_obj_perms_queryset = (organization_model.objects
+                                        .filter(organization=organization)
+                                        .filter(permission__content_type=ctype))
+    if len(codenames):
+        organizations_obj_perms_queryset = organizations_obj_perms_queryset.filter(
+            permission__codename__in=codenames)
+    if organization_model.objects.is_generic():
+        fields = ['object_pk', 'permission__codename']
+    else:
+        fields = ['content_object__pk', 'permission__codename']
+
+    if not any_perm and len(codenames):
+        organizations_obj_perms = organizations_obj_perms_queryset.values_list(*fields)
+        data = list(organizations_obj_perms)
+
+        keyfunc = lambda t: t[0]  # sorting/organizationing by pk (first in result tuple)
+        data = sorted(data, key=keyfunc)
+        pk_list = []
+        for pk, organization in groupby(data, keyfunc):
+            obj_codenames = set((e[1] for e in organization))
+            if any_perm or codenames.issubset(obj_codenames):
+                pk_list.append(pk)
+        objects = queryset.filter(pk__in=pk_list)
+        return objects
+
+    values = organizations_obj_perms_queryset.values_list(fields[0], flat=True)
+    if organization_model.objects.is_generic():
+        values = list(values)
+    return queryset.filter(pk__in=values)
+
