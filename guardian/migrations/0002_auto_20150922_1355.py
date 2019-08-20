@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('permission_expiry', models.DateTimeField(null=True, blank=True)),
                 ('content_type', models.ForeignKey(to='contenttypes.ContentType', on_delete=models.CASCADE)),
                 ('organization', models.ForeignKey(to='organizations.Organization', on_delete=models.CASCADE)),
-                ('permission', models.ForeignKey(to='auth.Permission')),
+                ('permission', models.ForeignKey(to='auth.Permission', on_delete=models.CASCADE)),
             ],
         ),
         migrations.AddField(
