@@ -9,21 +9,15 @@ from __future__ import unicode_literals
 
 import logging
 import os
-from datetime import datetime
 from itertools import chain
 
-import django
 from django.conf import settings
-from django.contrib.auth import REDIRECT_FIELD_NAME
+from django.contrib.auth import REDIRECT_FIELD_NAME, get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 from django.http import HttpResponseForbidden, HttpResponseNotFound
-from django.shortcuts import render_to_response, render
-from django.template import RequestContext
-from pytz import utc
-
-from guardian.compat import get_user_model
+from django.shortcuts import render
 from guardian.conf import settings as guardian_settings
 from guardian.ctypes import get_content_type
 from guardian.exceptions import NotUserNorGroup
@@ -77,6 +71,22 @@ def get_identity(identity):
     if isinstance(identity, AnonymousUser):
         identity = get_anonymous_user()
 
+    # get identity from queryset model type
+    if isinstance(identity, QuerySet):
+        identity_model_type = identity.model
+        if identity_model_type == get_user_model():
+            return identity, None, None
+        elif identity_model_type == Group:
+            return None, identitym None
+
+    # get identity from first element in list
+    if isinstance(identity, list) and isinstance(identity[0], get_user_model()):
+        return identity, None, None
+    if isinstance(identity, list) and isinstance(identity[0], Group):
+        return None, identity, None
+    if isinstance(identity, list) and isinstance(identity[0], Organization):
+        return None, None, identity
+
     if isinstance(identity, get_user_model()):
         return identity, None, None
     elif isinstance(identity, Group):
@@ -109,12 +119,7 @@ def get_40x_or_None(request, perms, obj=None, login_url=None,
     if not has_permissions:
         if return_403:
             if guardian_settings.RENDER_403:
-                if django.VERSION >= (1, 10):
-                    response = render(request, guardian_settings.TEMPLATE_403)
-                else:
-                    response = render_to_response(
-                        guardian_settings.TEMPLATE_403, {},
-                        RequestContext(request))
+                response = render(request, guardian_settings.TEMPLATE_403)
                 response.status_code = 403
                 return response
             elif guardian_settings.RAISE_403:
@@ -122,12 +127,7 @@ def get_40x_or_None(request, perms, obj=None, login_url=None,
             return HttpResponseForbidden()
         if return_404:
             if guardian_settings.RENDER_404:
-                if django.VERSION >= (1, 10):
-                    response = render(request, guardian_settings.TEMPLATE_404)
-                else:
-                    response = render_to_response(
-                        guardian_settings.TEMPLATE_404, {},
-                        RequestContext(request))
+                response = render(request, guardian_settings.TEMPLATE_404)
                 response.status_code = 404
                 return response
             elif guardian_settings.RAISE_404:
@@ -174,19 +174,13 @@ def get_obj_perms_model(obj, base_cls, generic_cls):
         obj = obj.__class__
     ctype = get_content_type(obj)
 
-    if django.VERSION >= (1, 8):
-        fields = (f for f in obj._meta.get_fields()
-                  if (f.one_to_many or f.one_to_one) and f.auto_created)
-    else:
-        fields = obj._meta.get_all_related_objects()
+    fields = (f for f in obj._meta.get_fields()
+                if (f.one_to_many or f.one_to_one) and f.auto_created)
 
     for attr in fields:
-        if django.VERSION < (1, 8):
-            model = getattr(attr, 'model', None)
-        else:
-            model = getattr(attr, 'related_model', None)
+        model = getattr(attr, 'related_model', None)
         if (model and issubclass(model, base_cls) and
-                model is not generic_cls):
+                model is not generic_cls and getattr(model, 'enabled', True)):
             # if model is generic one it would be returned anyway
             if not model.objects.is_generic():
                 # make sure that content_object's content_type is same as
@@ -213,25 +207,3 @@ def get_group_obj_perms_model(obj):
     from guardian.models import GroupObjectPermissionBase
     from guardian.models import GroupObjectPermission
     return get_obj_perms_model(obj, GroupObjectPermissionBase, GroupObjectPermission)
-
-
-def get_organization_obj_perms_model(obj):
-    """
-    Returns model class that connects given ``obj`` and Group class.
-    """
-    from guardian.models import OrganizationObjectPermissionBase
-    from guardian.models import OrganizationObjectPermission
-    return get_obj_perms_model(obj, OrganizationObjectPermissionBase, OrganizationObjectPermission)
-
-
-def calculate_permission_expiry(perm, renewal_period):
-    if not perm or not renewal_period:
-        return None
-
-    expiry = perm.permission_expiry
-    if expiry is None:
-        return (datetime.utcnow() + renewal_period).replace(tzinfo=utc)
-    elif expiry < datetime.utcnow().replace(tzinfo=utc):
-        return datetime.utcnow().replace(tzinfo=utc) + renewal_period
-    else:
-        return expiry.replace(tzinfo=utc) + renewal_period

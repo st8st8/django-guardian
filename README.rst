@@ -2,9 +2,6 @@
 django-guardian
 ===============
 
-This fork of Django guardian integrates with Django Organizations: https://github.com/bennylope/django-organizations
-Also allows permissions to expires after a certain amount of time.
-
 .. image:: https://travis-ci.org/django-guardian/django-guardian.svg?branch=devel
   :target: https://travis-ci.org/django-guardian/django-guardian
 
@@ -20,9 +17,9 @@ Requirements
 ------------
 
 * Python 2.7 or 3.4+
-* A supported version of Django (currently 1.8+)
+* A supported version of Django (currently 1.11+)
 
-Travis CI tests on Django version 1.8, 1.10, and 1.11.
+Travis CI tests on Django version 1.11, 2.0, and master.
 
 Installation
 ------------
@@ -44,7 +41,7 @@ We need to hook ``django-guardian`` into our project.
      ...
      'guardian',
     )
-   
+
 2. Add extra authorization backend to your ``settings.py``:
 
 .. code:: python

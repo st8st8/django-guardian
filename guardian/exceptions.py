@@ -26,3 +26,7 @@ class WrongAppError(GuardianError):
 
 class MixedContentTypeError(GuardianError):
     pass
+
+
+class MultipleIdentityAndObjectError(GuardianError):
+    pass

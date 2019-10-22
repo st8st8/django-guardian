@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from __future__ import unicode_literals
 from django.apps import apps
 from django.conf import settings
@@ -145,3 +142,17 @@ def permission_required_or_403(perm, *args, **kwargs):
     kwargs['return_403'] = True
     return permission_required(perm, *args, **kwargs)
 
+
+def permission_required_or_404(perm, *args, **kwargs):
+    """
+    Simple wrapper for permission_required decorator.
+
+    Standard Django's permission_required decorator redirects user to login page
+    in case permission check failed. This decorator may be used to return
+    HttpResponseNotFound (status 404) instead of redirection.
+
+    The only difference between ``permission_required`` decorator is that this
+    one always set ``return_404`` parameter to ``True``.
+    """
+    kwargs['return_404'] = True
+    return permission_required(perm, *args, **kwargs)

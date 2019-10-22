@@ -1,21 +1,13 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from datetime import datetime
+from itertools import chain
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.db.models.query import QuerySet
 from django.utils.encoding import force_text
-from django.db.models import Q
-from django.utils.timezone import utc
-from guardian.compat import get_user_model
 from guardian.ctypes import get_content_type
-from guardian.utils import get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
-    get_organization_obj_perms_model
-from itertools import chain
-
-
+from guardian.utils import get_group_obj_perms_model, get_identity, get_user_obj_perms_model
 
 
 def _get_pks_model_and_ctype(objects):
@@ -24,7 +16,6 @@ def _get_pks_model_and_ctype(objects):
     Assumes that all objects are of the same content type.
     """
 
-    ctype = None
     if isinstance(objects, QuerySet):
         model = objects.model
         pks = [force_text(pk) for pk in objects.values_list('pk', flat=True)]
@@ -78,12 +69,12 @@ class ObjectPermissionChecker(object):
         :param obj: Django model instance for which permission should be checked
 
         """
-        perm = perm.split('.')[-1]
         if self.user and not self.user.is_active:
             return False
         elif self.user and self.user.is_superuser:
             return True
-        perm = perm.split('.')[-1]
+        if '.' in perm:
+            _, perm = perm.split('.', maxsplit=1)
         return perm in self.get_perms(obj, permission_expiry)
 
     def get_organization_filters(self, obj, permission_expiry=False):
@@ -283,13 +274,17 @@ class ObjectPermissionChecker(object):
         if group_model.objects.is_generic():
             group_filters.update({
                 'content_type': ctype,
+                'object_pk__in': pks,
+            })
+        else:
+            group_filters.update({
+                'content_object_id__in': pks
             })
 
         if self.user:
             model = get_user_obj_perms_model(model)
             user_filters = {
                 'user': self.user,
-                'object_pk__in': pks
             }
 
             if model.objects.is_generic():

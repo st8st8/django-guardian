@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from __future__ import unicode_literals
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -85,7 +82,7 @@ class ObjectPermissionBackend(object):
             return False
 
         if '.' in perm:
-            app_label, perm = perm.split('.')
+            app_label, _ = perm.split('.', maxsplit=1)
             if app_label != obj._meta.app_label:
                 # Check the content_type app_label when permission
                 # and obj app labels don't match.
