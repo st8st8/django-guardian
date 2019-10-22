@@ -5,24 +5,29 @@ from __future__ import unicode_literals
 
 import warnings
 from collections import defaultdict
+from datetime import datetime
 from itertools import groupby
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db.models import Count, Q, QuerySet
 from django.shortcuts import _get_queryset
+from django.utils.timezone import utc
 
 from guardian.compat import basestring
 from guardian.core import ObjectPermissionChecker
 from guardian.ctypes import get_content_type
 from guardian.exceptions import MixedContentTypeError, WrongAppError, MultipleIdentityAndObjectError
 from guardian.models import GroupObjectPermission
-from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model
+from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
+    get_organization_obj_perms_model
+from organizations import models as organization_models
 
 
-def assign_perm(perm, user_or_group, obj=None):
+def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to_emails=True):
     """
     Assigns permission to user/group and object pair.
 
@@ -71,7 +76,7 @@ def assign_perm(perm, user_or_group, obj=None):
     <Permission: sites | site | Can change site>
 
     """
-    user, group = get_identity(user_or_group)
+    user, group, organization = get_identity(user_or_group)
     # If obj is None we try to operate on global permissions
     if obj is None:
         if not isinstance(perm, Permission):
@@ -89,6 +94,9 @@ def assign_perm(perm, user_or_group, obj=None):
         if group:
             group.permissions.add(perm)
             return perm
+        if organization:
+            organization.permissions.add(perm)
+            return perm
 
     if not isinstance(perm, Permission):
         perm = perm.split('.')[-1]
@@ -98,26 +106,36 @@ def assign_perm(perm, user_or_group, obj=None):
             raise MultipleIdentityAndObjectError("Only bulk operations on either users/groups OR objects supported")
         if user:
             model = get_user_obj_perms_model(obj.model)
-            return model.objects.bulk_assign_perm(perm, user, obj)
+            return model.objects.bulk_assign_perm(perm, user, obj, renewal_period, subscribe_to_emails)
         if group:
             model = get_group_obj_perms_model(obj.model)
-            return model.objects.bulk_assign_perm(perm, group, obj)
+            return model.objects.bulk_assign_perm(perm, group, obj, renewal_period, subscribe_to_emails)
+        if organization:
+            model = get_organization_obj_perms_model(obj.model)
+            return model.objects.bulk_assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
 
     if isinstance(user_or_group, (QuerySet, list)):
         if user:
             model = get_user_obj_perms_model(obj)
-            return model.objects.assign_perm_to_many(perm, user, obj)
+            return model.objects.assign_perm_to_many(perm, user, renewal_period, subscribe_to_emails)
         if group:
             model = get_group_obj_perms_model(obj)
-            return model.objects.assign_perm_to_many(perm, group, obj)
+            return model.objects.assign_perm_to_many(perm, group, obj, renewal_period, subscribe_to_emails)
+        if organization:
+            model = get_organization_obj_perms_model(obj)
+            return model.objects.assign_perm_to_many(perm, organization, obj, renewal_period, subscribe_to_emails)
 
     if user:
         model = get_user_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, user, obj)
+        return model.objects.assign_perm(perm, user, obj, renewal_period, subscribe_to_emails)
 
     if group:
         model = get_group_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, group, obj)
+        return model.objects.assign_perm(perm, group, obj, renewal_period, subscribe_to_emails)
+
+    if organization:
+        model = get_organization_obj_perms_model(obj)
+        return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
 
 
 def assign(perm, user_or_group, obj=None):
@@ -145,7 +163,7 @@ def remove_perm(perm, user_or_group=None, obj=None):
       Default is ``None``.
 
     """
-    user, group = get_identity(user_or_group)
+    user, group, organization = get_identity(user_or_group)
     if obj is None:
         try:
             app_label, codename = perm.split('.', 1)
@@ -179,6 +197,10 @@ def remove_perm(perm, user_or_group=None, obj=None):
     if group:
         model = get_group_obj_perms_model(obj)
         return model.objects.remove_perm(perm, group, obj)
+
+    if organization:
+        model = get_organization_obj_perms_model(obj)
+        return model.objects.remove_perm(perm, organization, obj)
 
 
 def get_perms(user_or_group, obj):
@@ -231,7 +253,8 @@ def get_perms_for_model(cls):
     return Permission.objects.filter(content_type=ctype)
 
 
-def get_unattached_users_with_perms_qset(obj, perm, permission_expiry=False, with_group_users=True, with_superusers=False):
+def get_unattached_users_with_perms_qset(obj, perm,
+                                         permission_expiry=False, with_group_users=True, with_superusers=False, only_with_perms_in=None):
     # It's much easier without attached perms so we do it first if that is
     # the case
 
@@ -286,6 +309,7 @@ def get_unattached_users_with_perms_qset(obj, perm, permission_expiry=False, wit
                 'groups__%s__content_object' % group_rel_name: obj,
             }
         if only_with_perms_in is not None:
+            permission_ids = Permission.objects.filter(content_type=ctype, codename__in=only_with_perms_in).values_list('id', flat=True)
             group_filters.update({
                 'groups__%s__permission_id__in' % group_rel_name: permission_ids,
                 })
@@ -385,7 +409,7 @@ def get_users_with_perms(obj, attach_perms=False, with_superusers=False,
 
 
 def get_users_with_permission(obj, perm, attach_perms=False, with_superusers=False,
-                         with_group_users=True, permission_expiry=False):
+                         with_group_users=True, permission_expiry=False, only_with_perms_in=None):
     qset = get_unattached_users_with_perms_qset(obj, perm,
          with_group_users=with_group_users,
          with_superusers=with_superusers,

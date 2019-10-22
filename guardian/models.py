@@ -8,7 +8,9 @@ from django.utils.six import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 from guardian.compat import unicode, user_model_label
 from guardian.ctypes import get_content_type
-from guardian.managers import GroupObjectPermissionManager, UserObjectPermissionManager
+from guardian.managers import GroupObjectPermissionManager, UserObjectPermissionManager, \
+    OrganizationObjectPermissionManager
+from organizations.models import Organization
 
 
 @python_2_unicode_compatible

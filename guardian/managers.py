@@ -67,7 +67,7 @@ class BaseObjectPermissionManager(models.Manager):
         obj_perm.save()
         return obj_perm
 
-    def bulk_assign_perm(self, perm, user_or_group, queryset):
+    def bulk_assign_perm(self, perm, user_or_group, queryset, renewal_period=None, subscribe_to_emails=False):
         """
         Bulk assigns permissions with given ``perm`` for an objects in ``queryset`` and
         ``user_or_group``.
@@ -85,7 +85,12 @@ class BaseObjectPermissionManager(models.Manager):
         assigned_perms = []
         for instance in queryset:
             if not checker.has_perm(permission.codename, instance):
-                kwargs = {'permission': permission, self.user_or_group_field: user_or_group}
+                kwargs = {
+                    'permission': permission,
+                    self.user_or_group_field: user_or_group,
+                    'renewal_period': renewal_period,
+                    'subscribe_to_emails': subscribe_to_emails
+                }
                 if self.is_generic():
                     kwargs['content_type'] = ctype
                     kwargs['object_pk'] = instance.pk
@@ -96,7 +101,7 @@ class BaseObjectPermissionManager(models.Manager):
 
         return assigned_perms
 
-    def assign_perm_to_many(self, perm, users_or_groups, obj):
+    def assign_perm_to_many(self, perm, users_or_groups, obj, renewal_period=None, subscribe_to_emails=False):
         """
         Bulk assigns given ``perm`` for the object ``obj`` to a set of users or a set of groups.
         """
@@ -107,12 +112,17 @@ class BaseObjectPermissionManager(models.Manager):
         else:
             permission = perm
 
-        kwargs = {'permission': permission}
+        kwargs = {
+            'permission': permission,
+            'renewal_period': renewal_period,
+            'subscribe_to_emails': subscribe_to_emails,
+        }
         if self.is_generic():
             kwargs['content_type'] = ctype
             kwargs['object_pk'] = obj.pk
         else:
             kwargs['content_object'] = obj
+
 
         to_add = []
         field = self.user_or_group_field

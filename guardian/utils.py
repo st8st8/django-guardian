@@ -9,6 +9,7 @@ from __future__ import unicode_literals
 
 import logging
 import os
+from datetime import datetime
 from itertools import chain
 
 from django.conf import settings
@@ -18,6 +19,8 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Model, QuerySet
 from django.http import HttpResponseForbidden, HttpResponseNotFound
 from django.shortcuts import render
+from django.utils.timezone import utc
+
 from guardian.conf import settings as guardian_settings
 from guardian.ctypes import get_content_type
 from guardian.exceptions import NotUserNorGroup
@@ -77,7 +80,7 @@ def get_identity(identity):
         if identity_model_type == get_user_model():
             return identity, None, None
         elif identity_model_type == Group:
-            return None, identitym None
+            return None, identity, None
 
     # get identity from first element in list
     if isinstance(identity, list) and isinstance(identity[0], get_user_model()):
@@ -207,3 +210,25 @@ def get_group_obj_perms_model(obj):
     from guardian.models import GroupObjectPermissionBase
     from guardian.models import GroupObjectPermission
     return get_obj_perms_model(obj, GroupObjectPermissionBase, GroupObjectPermission)
+
+
+def get_organization_obj_perms_model(obj):
+    """
+    Returns model class that connects given ``obj`` and Group class.
+    """
+    from guardian.models import OrganizationObjectPermissionBase
+    from guardian.models import OrganizationObjectPermission
+    return get_obj_perms_model(obj, OrganizationObjectPermissionBase, OrganizationObjectPermission)
+
+
+def calculate_permission_expiry(perm, renewal_period):
+    if not perm or not renewal_period:
+        return None
+
+    expiry = perm.permission_expiry
+    if expiry is None:
+        return (datetime.utcnow() + renewal_period).replace(tzinfo=utc)
+    elif expiry < datetime.utcnow().replace(tzinfo=utc):
+        return datetime.utcnow().replace(tzinfo=utc) + renewal_period
+    else:
+        return expiry.replace(tzinfo=utc) + renewal_period
