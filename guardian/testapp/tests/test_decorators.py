@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 from django.conf import global_settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, AnonymousUser
@@ -32,7 +31,7 @@ user_model_path = get_user_model_path()
 class PermissionRequiredTest(TestDataMixin, TestCase):
 
     def setUp(self):
-        super(PermissionRequiredTest, self).setUp()
+        super().setUp()
         self.anon = AnonymousUser()
         self.user = User.objects.get_or_create(username='jack')[0]
         self.group = Group.objects.get_or_create(name='jackGroup')[0]

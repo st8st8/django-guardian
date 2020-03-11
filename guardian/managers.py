@@ -1,11 +1,11 @@
-from __future__ import unicode_literals
+from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import Q
 from guardian.core import ObjectPermissionChecker
 from guardian.ctypes import get_content_type
 from guardian.exceptions import ObjectNotPersisted
-from guardian.models import Permission
-from guardian.utils import calculate_permission_expiry
+from django.contrib.auth.models import Permission
+
 import warnings
 
 
@@ -16,21 +16,14 @@ class BaseObjectPermissionManager(models.Manager):
         try:
             self.model._meta.get_field('user')
             return 'user'
-        except models.fields.FieldDoesNotExist:
-            pass
-
-        try:
-            self.model._meta.get_field('group')
+        except FieldDoesNotExist:
             return 'group'
-        except models.fields.FieldDoesNotExist:
-            pass
-        return 'organization'
 
     def is_generic(self):
         try:
             self.model._meta.get_field('object_pk')
             return True
-        except models.fields.FieldDoesNotExist:
+        except FieldDoesNotExist:
             return False
 
     def assign_perm(self, perm, user_or_group, obj, renewal_period=None, subscribe_to_emails=True):
@@ -122,7 +115,6 @@ class BaseObjectPermissionManager(models.Manager):
             kwargs['object_pk'] = obj.pk
         else:
             kwargs['content_object'] = obj
-
 
         to_add = []
         field = self.user_or_group_field

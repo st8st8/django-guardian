@@ -1,33 +1,37 @@
 """
 Convenient shortcuts to manage or check object permissions.
 """
-from __future__ import unicode_literals
-
 import warnings
 from collections import defaultdict
-from datetime import datetime
 from itertools import groupby
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import cache
 from django.db.models import Count, Q, QuerySet
 from django.shortcuts import _get_queryset
-from django.utils.timezone import utc
-
-from guardian.compat import basestring
+from django.db.models.functions import Cast
+from django.db.models import (
+    IntegerField,
+    AutoField,
+    BigIntegerField,
+    PositiveIntegerField,
+    PositiveSmallIntegerField,
+    SmallIntegerField,
+    ForeignKey
+)
 from guardian.core import ObjectPermissionChecker
 from guardian.ctypes import get_content_type
 from guardian.exceptions import MixedContentTypeError, WrongAppError, MultipleIdentityAndObjectError
 from guardian.models import GroupObjectPermission
-from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
-    get_organization_obj_perms_model
-from organizations import models as organization_models
+from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model
+OrganizationObjectPermission = get_group_obj_perms_model()
+GroupObjectPermission = get_group_obj_perms_model()
+UserObjectPermission = get_user_obj_perms_model()
 
 
-def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to_emails=True):
+def assign_perm(perm, user_or_group, obj=None):
     """
     Assigns permission to user/group and object pair.
 
@@ -37,7 +41,7 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
       ``Permission`` instance.
 
     :param user_or_group: instance of ``User``, ``AnonymousUser``, ``Group``,
-      list of ``User`` or ``Group``, or queryset of ``User`` or ``Group``; 
+      list of ``User`` or ``Group``, or queryset of ``User`` or ``Group``;
       passing any other object would raise
       ``guardian.exceptions.NotUserNorGroup`` exception
 
@@ -99,7 +103,8 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
             return perm
 
     if not isinstance(perm, Permission):
-        perm = perm.split('.')[-1]
+        if '.' in perm:
+            app_label, perm = perm.split(".", 1)
 
     if isinstance(obj, QuerySet):
         if isinstance(user_or_group, (QuerySet, list)):
@@ -127,15 +132,11 @@ def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to
 
     if user:
         model = get_user_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, user, obj, renewal_period, subscribe_to_emails)
+        return model.objects.assign_perm(perm, user, obj)
 
     if group:
         model = get_group_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, group, obj, renewal_period, subscribe_to_emails)
-
-    if organization:
-        model = get_organization_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
+        return model.objects.assign_perm(perm, group, obj)
 
 
 def assign(perm, user_or_group, obj=None):
@@ -244,7 +245,7 @@ def get_perms_for_model(cls):
     Returns queryset of all Permission objects for the given class. It is
     possible to pass Model as class or instance.
     """
-    if isinstance(cls, basestring):
+    if isinstance(cls, str):
         app_label, model_name = cls.split('.')
         model = apps.get_model(app_label, model_name)
     else:
@@ -619,7 +620,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         - If accept_global_perms is ``True``: Empty list.
         - If accept_global_perms is ``False``: Empty list.
     """
-    if isinstance(perms, basestring):
+    if isinstance(perms, str):
         perms = [perms]
     ctype = None
     app_label = None
@@ -762,7 +763,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             data = sorted(data, key=keyfunc)
             pk_list = []
             for pk, group in groupby(data, keyfunc):
-                obj_codenames = set((e[1] for e in group))
+                obj_codenames = {e[1] for e in group}
                 if codenames.issubset(obj_codenames):
                     pk_list.append(pk)
             objects = queryset.filter(pk__in=pk_list)
@@ -774,19 +775,37 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
         user_obj_perms_queryset = counts.filter(
             object_pk_count__gte=len(codenames))
 
-    values = user_obj_perms_queryset.values_list(user_fields[0], flat=True)
-    if user_model.objects.is_generic():
-        values = set(values)
+    is_cast_integer = _is_cast_integer_pk(queryset)
+
+    field_pk = user_fields[0]
+    values = user_obj_perms_queryset
+    if is_cast_integer:
+        values = values.annotate(
+            obj_pk=Cast(field_pk, BigIntegerField())
+        )
+        field_pk = 'obj_pk'
+
+    values = values.values_list(field_pk, flat=True)
     q = Q(pk__in=values)
     if use_groups:
-        values = groups_obj_perms_queryset.values_list(group_fields[0], flat=True)
-        if group_model.objects.is_generic():
-            values = set(values)
+        field_pk = group_fields[0]
+        values = groups_obj_perms_queryset
+        if is_cast_integer:
+            values = values.annotate(
+                obj_pk=Cast(field_pk, BigIntegerField())
+            )
+            field_pk = 'obj_pk'
+        values = values.values_list(field_pk, flat=True)
         q |= Q(pk__in=values)
 
-        values = organizations_obj_perms_queryset.values_list(organization_fields[0], flat=True)
-        if organization_model.objects.is_generic():
-            values = list(values)
+        field_pk = organization_fields[0]
+        values = organizations_obj_perms_queryset
+        if is_cast_integer:
+            values = values.annotate(
+                obj_pk=Cast(field_pk, BigIntegerField())
+            )
+            field_pk = 'obj_pk'
+        values = values.values_list(field_pk, flat=True)
         q |= Q(pk__in=values)
 
     return queryset.filter(q)
@@ -849,7 +868,7 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
         [<Task some task>]
 
     """
-    if isinstance(perms, basestring):
+    if isinstance(perms, str):
         perms = [perms]
     ctype = None
     app_label = None
@@ -926,15 +945,24 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
         data = sorted(data, key=keyfunc)
         pk_list = []
         for pk, group in groupby(data, keyfunc):
-            obj_codenames = set((e[1] for e in group))
+            obj_codenames = {e[1] for e in group}
             if any_perm or codenames.issubset(obj_codenames):
                 pk_list.append(pk)
         objects = queryset.filter(pk__in=pk_list)
         return objects
 
-    values = groups_obj_perms_queryset.values_list(fields[0], flat=True)
-    if group_model.objects.is_generic():
-        values = list(values)
+    is_cast_integer = _is_cast_integer_pk(queryset)
+
+    field_pk = fields[0]
+    values = groups_obj_perms_queryset
+
+    if is_cast_integer:
+        values = values.annotate(
+            obj_pk=Cast(field_pk, BigIntegerField())
+        )
+        field_pk = 'obj_pk'
+
+    values = values.values_list(field_pk, flat=True)
     return queryset.filter(pk__in=values)
 
 
@@ -1050,7 +1078,7 @@ def get_objects_for_organization(organization, perms, klass=None, any_perm=False
         data = sorted(data, key=keyfunc)
         pk_list = []
         for pk, organization in groupby(data, keyfunc):
-            obj_codenames = set((e[1] for e in organization))
+            obj_codenames = {(e[1] for e in organization)}
             if any_perm or codenames.issubset(obj_codenames):
                 pk_list.append(pk)
         objects = queryset.filter(pk__in=pk_list)
@@ -1061,3 +1089,14 @@ def get_objects_for_organization(organization, perms, klass=None, any_perm=False
         values = list(values)
     return queryset.filter(pk__in=values)
 
+
+def _is_cast_integer_pk(queryset):
+    pk = queryset.model._meta.pk
+
+    if isinstance(pk, ForeignKey):
+        return _is_cast_integer_pk(pk.target_field)
+
+    return isinstance(pk, (
+        IntegerField, AutoField, BigIntegerField,
+        PositiveIntegerField, PositiveSmallIntegerField,
+        SmallIntegerField))

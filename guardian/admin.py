@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from collections import OrderedDict
 
 from django import forms
@@ -8,14 +6,13 @@ from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
-from django.utils.translation import ugettext_lazy as _
-from django.utils.translation import ugettext
-from guardian.compat import url
-from guardian.forms import GroupObjectPermissionsForm, UserObjectPermissionsForm, OrganizationObjectPermissionsForm
-from guardian.models import Group
+from django.urls import reverse, path
+from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext
+from guardian.forms import GroupObjectPermissionsForm, UserObjectPermissionsForm
+from django.contrib.auth.models import Group
 from guardian.shortcuts import (get_group_perms, get_groups_with_perms, get_perms_for_model, get_user_perms,
-                                get_users_with_perms, get_organization_perms)
+                                get_users_with_perms)
 
 
 class AdminUserObjectPermissionsForm(UserObjectPermissionsForm):
@@ -71,7 +68,7 @@ class GuardedModelAdminMixin(object):
     include_object_permissions_urls = True
 
     def get_queryset(self, request):
-        qs = super(GuardedModelAdminMixin, self).get_queryset(request)
+        qs = super().get_queryset(request)
 
         if request.user.is_superuser:
             return qs
@@ -82,7 +79,7 @@ class GuardedModelAdminMixin(object):
         if self.user_can_access_owned_by_group_objects_only:
             User = get_user_model()
             user_rel_name = User.groups.field.related_query_name()
-            qs_key = '%s__%s' % (self.group_owned_objects_field, user_rel_name)
+            qs_key = '{}__{}'.format(self.group_owned_objects_field, user_rel_name)
             filters = {qs_key: request.user}
             qs = qs.filter(**filters)
         return qs
@@ -100,22 +97,22 @@ class GuardedModelAdminMixin(object):
            ``/admin/flatpages/1/``)
 
         """
-        urls = super(GuardedModelAdminMixin, self).get_urls()
+        urls = super().get_urls()
         if self.include_object_permissions_urls:
             info = self.model._meta.app_label, self.model._meta.model_name
             myurls = [
-                url(r'^(?P<object_pk>.+)/permissions/$',
-                    view=self.admin_site.admin_view(
-                        self.obj_perms_manage_view),
-                    name='%s_%s_permissions' % info),
-                url(r'^(?P<object_pk>.+)/permissions/user-manage/(?P<user_id>\-?\d+)/$',
-                    view=self.admin_site.admin_view(
-                        self.obj_perms_manage_user_view),
-                    name='%s_%s_permissions_manage_user' % info),
-                url(r'^(?P<object_pk>.+)/permissions/group-manage/(?P<group_id>\-?\d+)/$',
-                    view=self.admin_site.admin_view(
-                        self.obj_perms_manage_group_view),
-                    name='%s_%s_permissions_manage_group' % info),
+                path('<object_pk>/permissions/',
+                     view=self.admin_site.admin_view(
+                         self.obj_perms_manage_view),
+                     name='%s_%s_permissions' % info),
+                path('<object_pk>/permissions/user-manage/<user_id>/',
+                     view=self.admin_site.admin_view(
+                         self.obj_perms_manage_user_view),
+                     name='%s_%s_permissions_manage_user' % info),
+                path('<object_pk>/permissions/group-manage/<group_id>/',
+                     view=self.admin_site.admin_view(
+                         self.obj_perms_manage_group_view),
+                     name='%s_%s_permissions_manage_group' % info),
             ]
             urls = myurls + urls
         return urls
@@ -133,7 +130,7 @@ class GuardedModelAdminMixin(object):
             'object': obj,
             'app_label': self.model._meta.app_label,
             'opts': self.model._meta,
-            'original': hasattr(obj, '__unicode__') and obj.__unicode__() or str(obj),
+            'original': str(obj),
             'has_change_permission': self.has_change_permission(request, obj),
             'model_perms': get_perms_for_model(obj),
             'title': _("Object permissions"),
@@ -172,9 +169,10 @@ class GuardedModelAdminMixin(object):
         )
 
         if request.method == 'POST' and 'submit_manage_user' in request.POST:
-            user_form = self.get_obj_perms_user_select_form(request)(request.POST)
-            group_form = self.get_obj_perms_group_select_form(request)(request.POST)
-            organization_form = self.get_obj_perms_organization_select_form(request)(request.POST)
+            user_form = self.get_obj_perms_user_select_form(
+                request)(request.POST)
+            group_form = self.get_obj_perms_group_select_form(
+                request)(request.POST)
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
@@ -188,9 +186,10 @@ class GuardedModelAdminMixin(object):
                 )
                 return redirect(url)
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
-            user_form = self.get_obj_perms_user_select_form(request)(request.POST)
-            group_form = self.get_obj_perms_group_select_form(request)(request.POST)
-            organization_form = self.get_obj_perms_organization_select_form(request)(request.POST)
+            user_form = self.get_obj_perms_user_select_form(
+                request)(request.POST)
+            group_form = self.get_obj_perms_group_select_form(
+                request)(request.POST)
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
@@ -201,22 +200,6 @@ class GuardedModelAdminMixin(object):
                 url = reverse(
                     '%s:%s_%s_permissions_manage_group' % info,
                     args=[obj.pk, group_id]
-                )
-                return redirect(url)
-        elif request.method == 'POST' and 'submit_manage_group' in request.POST:
-            user_form = self.get_obj_perms_user_select_form(request)(request.POST)
-            group_form = self.get_obj_perms_group_select_form(request)(request.POST)
-            organization_form = self.get_obj_perms_organization_select_form(request)(request.POST)
-            info = (
-                self.admin_site.name,
-                self.model._meta.app_label,
-                self.model._meta.model_name,
-            )
-            if organization_form.is_valid():
-                organization_id = organization_form.cleaned_data['group'].id
-                url = reverse(
-                    '%s:%s_%s_permissions_manage_group' % info,
-                    args=[obj.pk, organization_id]
                 )
                 return redirect(url)
         else:
@@ -263,7 +246,7 @@ class GuardedModelAdminMixin(object):
 
         if request.method == 'POST' and form.is_valid():
             form.save_obj_perms()
-            msg = ugettext("Permissions saved.")
+            msg = gettext("Permissions saved.")
             messages.success(request, msg)
             info = (
                 self.admin_site.name,
@@ -313,7 +296,6 @@ class GuardedModelAdminMixin(object):
         """
         return GroupManage
 
-
     def get_obj_perms_manage_user_form(self, request):
         """
         Returns form class for user object permissions management.  By default
@@ -336,7 +318,7 @@ class GuardedModelAdminMixin(object):
 
         if request.method == 'POST' and form.is_valid():
             form.save_obj_perms()
-            msg = ugettext("Permissions saved.")
+            msg = gettext("Permissions saved.")
             messages.success(request, msg)
             info = (
                 self.admin_site.name,

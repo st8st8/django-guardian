@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 from django.contrib.auth import get_user_model
 from django.db import models
 from guardian.conf import settings
@@ -48,12 +47,12 @@ def check_support(user_obj, obj):
     return obj_support and user_support, user_obj
 
 
-class ObjectPermissionBackend(object):
+class ObjectPermissionBackend:
     supports_object_permissions = True
     supports_anonymous_user = True
     supports_inactive_user = True
 
-    def authenticate(self, username, password):
+    def authenticate(self, request, username=None, password=None):
         return None
 
     def has_perm(self, user_obj, perm, obj=None, check_permission_expiry=True):
@@ -82,7 +81,7 @@ class ObjectPermissionBackend(object):
             return False
 
         if '.' in perm:
-            app_label, _ = perm.split('.', maxsplit=1)
+            app_label, _ = perm.split('.', 1)
             if app_label != obj._meta.app_label:
                 # Check the content_type app_label when permission
                 # and obj app labels don't match.

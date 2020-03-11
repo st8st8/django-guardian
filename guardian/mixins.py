@@ -1,20 +1,15 @@
-from __future__ import unicode_literals
+from collections.abc import Iterable
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, REDIRECT_FIELD_NAME
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from guardian.compat import basestring
-from guardian.models import UserObjectPermission
+from guardian.utils import get_user_obj_perms_model
+UserObjectPermission = get_user_obj_perms_model()
 from guardian.utils import get_40x_or_None, get_anonymous_user
 from guardian.shortcuts import get_objects_for_user
 
-try:
-    from collections.abc import Iterable
-except ImportError:
-    # Python 2.7 compat
-    from collections import Iterable
 
-
-class LoginRequiredMixin(object):
+class LoginRequiredMixin:
     """
     A login required mixin for use with class based views. This Class is a
     light wrapper around the `login_required` decorator and hence function
@@ -23,7 +18,7 @@ class LoginRequiredMixin(object):
     Due to parent class order traversal this mixin must be added as the left
     most mixin of a view.
 
-    The mixin has exaclty the same flow as `login_required` decorator:
+    The mixin has exactly the same flow as `login_required` decorator:
 
         If the user isn't logged in, redirect to ``settings.LOGIN_URL``, passing
         the current absolute path in the query string. Example:
@@ -49,11 +44,11 @@ class LoginRequiredMixin(object):
     def dispatch(self, request, *args, **kwargs):
         return login_required(redirect_field_name=self.redirect_field_name,
                               login_url=self.login_url)(
-            super(LoginRequiredMixin, self).dispatch
+            super().dispatch
         )(request, *args, **kwargs)
 
 
-class PermissionRequiredMixin(object):
+class PermissionRequiredMixin:
     """
     A view mixin that verifies if the current logged in user has the specified
     permission by wrapping the ``request.user.has_perm(..)`` method.
@@ -149,7 +144,7 @@ class PermissionRequiredMixin(object):
 
         :param request: Original request.
         """
-        if isinstance(self.permission_required, basestring):
+        if isinstance(self.permission_required, str):
             perms = [self.permission_required]
         elif isinstance(self.permission_required, Iterable):
             perms = [p for p in self.permission_required]
@@ -209,11 +204,10 @@ class PermissionRequiredMixin(object):
         response = self.check_permissions(request)
         if response:
             return response
-        return super(PermissionRequiredMixin, self).dispatch(request, *args,
-                                                             **kwargs)
+        return super().dispatch(request, *args, **kwargs)
 
 
-class GuardianUserMixin(object):
+class GuardianUserMixin:
 
     @staticmethod
     def get_anonymous():
@@ -226,7 +220,7 @@ class GuardianUserMixin(object):
         return UserObjectPermission.objects.remove_perm(perm, self, obj)
 
 
-class PermissionListMixin(object):
+class PermissionListMixin:
     """
     A view mixin that filter object in queryset for the current logged by required permission.
 
@@ -254,7 +248,7 @@ class PermissionListMixin(object):
 
     ``PermissionListMixin.get_objects_for_user_extra_kwargs``
 
-        *Default*: ``{}``,  A extra params to pass for ```guardian.shorcuts.get_objects_for_user```
+        *Default*: ``{}``,  A extra params to pass for ```guardian.shortcuts.get_objects_for_user```
 
     """
     permission_required = None
@@ -268,7 +262,7 @@ class PermissionListMixin(object):
 
         :param request: Original request.
         """
-        if isinstance(self.permission_required, basestring):
+        if isinstance(self.permission_required, str):
             perms = [self.permission_required]
         elif isinstance(self.permission_required, Iterable):
             perms = [p for p in self.permission_required]
@@ -291,5 +285,5 @@ class PermissionListMixin(object):
                     **self.get_objects_for_user_extra_kwargs)
 
     def get_queryset(self, *args, **kwargs):
-        qs = super(PermissionListMixin, self).get_queryset(*args, **kwargs)
+        qs = super().get_queryset(*args, **kwargs)
         return get_objects_for_user(**self.get_get_objects_for_user_kwargs(qs))
