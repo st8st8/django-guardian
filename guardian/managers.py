@@ -8,6 +8,8 @@ from django.contrib.auth.models import Permission
 
 import warnings
 
+from guardian.utils import calculate_permission_expiry
+
 
 class BaseObjectPermissionManager(models.Manager):
 

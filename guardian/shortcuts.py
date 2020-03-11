@@ -3,12 +3,15 @@ Convenient shortcuts to manage or check object permissions.
 """
 import warnings
 from collections import defaultdict
+from datetime import datetime
 from itertools import groupby
+from organizations import models as organization_models
 
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db.models import Count, Q, QuerySet
 from django.shortcuts import _get_queryset
 from django.db.models.functions import Cast
@@ -21,11 +24,14 @@ from django.db.models import (
     SmallIntegerField,
     ForeignKey
 )
+from pytz import utc
+
 from guardian.core import ObjectPermissionChecker
 from guardian.ctypes import get_content_type
 from guardian.exceptions import MixedContentTypeError, WrongAppError, MultipleIdentityAndObjectError
-from guardian.models import GroupObjectPermission
-from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model
+from guardian.utils import get_anonymous_user, get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
+    get_organization_obj_perms_model
+
 OrganizationObjectPermission = get_group_obj_perms_model()
 GroupObjectPermission = get_group_obj_perms_model()
 UserObjectPermission = get_user_obj_perms_model()
@@ -967,52 +973,7 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
 
 
 def get_objects_for_organization(organization, perms, klass=None, any_perm=False, accept_global_perms=True):
-    """
-    Returns queryset of objects for which a given ``organization`` has *all*
-    permissions present at ``perms``.
-
-    :param organization: ``organization`` instance for which objects would be returned.
-    :param perms: single permission string, or sequence of permission strings
-      which should be checked.
-      If ``klass`` parameter is not given, those should be full permission
-      names rather than only codenames (i.e. ``auth.change_user``). If more than
-      one permission is present within sequence, their content type **must** be
-      the same or ``MixedContentTypeError`` exception would be raised.
-    :param klass: may be a Model, Manager or QuerySet object. If not given
-      this parameter would be computed based on given ``params``.
-    :param any_perm: if True, any of permission in sequence is accepted
-
-    :raises MixedContentTypeError: when computed content type for ``perms``
-      and/or ``klass`` clashes.
-    :raises WrongAppError: if cannot compute app label for given ``perms``/
-      ``klass``.
-
-    Example:
-
-    Let's assume we have a ``Task`` model belonging to the ``tasker`` app with
-    the default add_task, change_task and delete_task permissions provided
-    by Django::
-
-        >>> from guardian.shortcuts import get_objects_for_organization
-        >>> from tasker import Task
-        >>> organization = organization.objects.create('some organization')
-        >>> task = Task.objects.create('some task')
-        >>> get_objects_for_organization(organization, 'tasker.add_task')
-        []
-        >>> from guardian.shortcuts import assign_perm
-        >>> assign_perm('tasker.add_task', organization, task)
-        >>> get_objects_for_organization(organization, 'tasker.add_task')
-        [<Task some task>]
-
-    The permission string can also be an iterable. Continuing with the previous example:
-        >>> get_objects_for_organization(organization, ['tasker.add_task', 'tasker.delete_task'])
-        []
-        >>> assign_perm('tasker.delete_task', organization, task)
-        >>> get_objects_for_organization(organization, ['tasker.add_task', 'tasker.delete_task'])
-        [<Task some task>]
-
-    """
-    if isinstance(perms, basestring):
+    if isinstance(perms, str):
         perms = [perms]
     ctype = None
     app_label = None

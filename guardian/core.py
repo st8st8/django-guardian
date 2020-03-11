@@ -1,13 +1,17 @@
+from datetime import datetime
 from itertools import chain
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.db.models import Q
 from django.db.models.query import QuerySet
 from django.utils.encoding import force_str
+from pytz import utc
 
 from guardian.conf import settings as guardian_settings
 from guardian.ctypes import get_content_type
-from guardian.utils import get_group_obj_perms_model, get_identity, get_user_obj_perms_model
+from guardian.utils import get_group_obj_perms_model, get_identity, get_user_obj_perms_model, \
+    get_organization_obj_perms_model
 
 
 def _get_pks_model_and_ctype(objects):
@@ -259,7 +263,7 @@ class ObjectPermissionChecker:
                 .values_list("codename")))
 
             for pk in pks:
-                key = (ctype.id, force_text(pk))
+                key = (ctype.id, force_str(pk))
                 self._obj_perms_cache[key] = perms
 
             return True

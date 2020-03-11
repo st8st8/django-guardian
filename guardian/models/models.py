@@ -96,6 +96,7 @@ class GroupObjectPermissionAbstract(GroupObjectPermissionBase, BaseGenericObject
         abstract = True
         unique_together = ['group', 'permission', 'object_pk']
 
+
 class GroupObjectPermission(GroupObjectPermissionAbstract):
 
     class Meta(GroupObjectPermissionAbstract.Meta):

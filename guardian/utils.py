@@ -170,7 +170,6 @@ def clean_orphan_obj_perms():
     from guardian.models import GroupObjectPermission
     from guardian.models import OrganizationObjectPermission
 
-
     deleted = 0
     # TODO: optimise
     for perm in chain(UserObjectPermission.objects.all().iterator(),

@@ -7,6 +7,9 @@ from .models import (
     GroupObjectPermissionBase,
     GroupObjectPermissionAbstract,
     GroupObjectPermission,
+    OrganizationObjectPermissionBase,
+    OrganizationObjectPermissionAbstract,
+    OrganizationObjectPermission,
     Permission,
     Group
 )
