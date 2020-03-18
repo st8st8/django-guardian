@@ -37,7 +37,7 @@ GroupObjectPermission = get_group_obj_perms_model()
 UserObjectPermission = get_user_obj_perms_model()
 
 
-def assign_perm(perm, user_or_group, obj=None):
+def assign_perm(perm, user_or_group, obj=None, renewal_period=None, subscribe_to_emails=None):
     """
     Assigns permission to user/group and object pair.
 
@@ -138,11 +138,15 @@ def assign_perm(perm, user_or_group, obj=None):
 
     if user:
         model = get_user_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, user, obj)
+        return model.objects.assign_perm(perm, user, obj, renewal_period, subscribe_to_emails)
 
     if group:
         model = get_group_obj_perms_model(obj)
-        return model.objects.assign_perm(perm, group, obj)
+        return model.objects.assign_perm(perm, group, obj, renewal_period, subscribe_to_emails)
+
+    if organization:
+        model = get_organization_obj_perms_model(obj)
+        return model.objects.assign_perm(perm, organization, obj, renewal_period, subscribe_to_emails)
 
 
 def assign(perm, user_or_group, obj=None):
@@ -769,7 +773,7 @@ def get_objects_for_user(user, perms, klass=None, use_groups=True, any_perm=Fals
             data = sorted(data, key=keyfunc)
             pk_list = []
             for pk, group in groupby(data, keyfunc):
-                obj_codenames = {e[1] for e in group}
+                obj_codenames = set((e[1] for e in group))
                 if codenames.issubset(obj_codenames):
                     pk_list.append(pk)
             objects = queryset.filter(pk__in=pk_list)
@@ -951,7 +955,7 @@ def get_objects_for_group(group, perms, klass=None, any_perm=False, accept_globa
         data = sorted(data, key=keyfunc)
         pk_list = []
         for pk, group in groupby(data, keyfunc):
-            obj_codenames = {e[1] for e in group}
+            obj_codenames = set((e[1] for e in group))
             if any_perm or codenames.issubset(obj_codenames):
                 pk_list.append(pk)
         objects = queryset.filter(pk__in=pk_list)
@@ -1039,7 +1043,7 @@ def get_objects_for_organization(organization, perms, klass=None, any_perm=False
         data = sorted(data, key=keyfunc)
         pk_list = []
         for pk, organization in groupby(data, keyfunc):
-            obj_codenames = {(e[1] for e in organization)}
+            obj_codenames = set((e[1] for e in organization))
             if any_perm or codenames.issubset(obj_codenames):
                 pk_list.append(pk)
         objects = queryset.filter(pk__in=pk_list)

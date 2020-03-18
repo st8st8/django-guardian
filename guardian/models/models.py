@@ -116,7 +116,7 @@ class OrganizationObjectPermissionBase(BaseObjectPermission):
         unique_together = ['organization', 'permission', 'content_object']
 
 
-class OrganizationObjectPermissionAbstract(GroupObjectPermissionBase, BaseGenericObjectPermission):
+class OrganizationObjectPermissionAbstract(OrganizationObjectPermissionBase, BaseGenericObjectPermission):
 
     class Meta(OrganizationObjectPermissionBase.Meta, BaseGenericObjectPermission.Meta):
         abstract = True
