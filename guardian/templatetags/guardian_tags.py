@@ -22,7 +22,7 @@ except ImportError:
 
 class ObjectPermissionsNode(template.Node):
 
-    def __init__(self, for_whom, obj, include_group_permissions, context_var):
+    def __init__(self, for_whom, obj, include_group_permissions, context_var, checker=None):
         self.for_whom = template.Variable(for_whom)
         self.obj = template.Variable(obj)
         self.include_group_permissions = include_group_permissions
