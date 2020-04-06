@@ -172,7 +172,8 @@ class GuardedModelAdminMixin(object):
             user_form = self.get_obj_perms_user_select_form(
                 request)(request.POST)
             group_form = self.get_obj_perms_group_select_form(
-                request)(request.POST)
+                request)()
+            organization_form = OrganizationManage()
             info = (
                 self.admin_site.name,
                 self.model._meta.app_label,
@@ -187,7 +188,7 @@ class GuardedModelAdminMixin(object):
                 return redirect(url)
         elif request.method == 'POST' and 'submit_manage_group' in request.POST:
             user_form = self.get_obj_perms_user_select_form(
-                request)(request.POST)
+                request)()
             group_form = self.get_obj_perms_group_select_form(
                 request)(request.POST)
             info = (
@@ -200,6 +201,22 @@ class GuardedModelAdminMixin(object):
                 url = reverse(
                     '%s:%s_%s_permissions_manage_group' % info,
                     args=[obj.pk, group_id]
+                )
+                return redirect(url)
+        elif request.method == 'POST' and 'submit_manage_organization' in request.POST:
+            user_form = UserManage()
+            group_form = GroupManage()
+            organization_form = OrganizationManage(request.POST)
+            info = (
+                self.admin_site.name,
+                self.model._meta.app_label,
+                get_model_name(self.model)
+            )
+            if organization_form.is_valid():
+                org_id = organization_form.cleaned_data['organization'].id
+                url = reverse(
+                    '%s:%s_%s_permissions_manage_organization' % info,
+                    args=[obj.pk, org_id]
                 )
                 return redirect(url)
         else:
@@ -295,6 +312,13 @@ class GuardedModelAdminMixin(object):
         default :form:`GroupManage` is returned.
         """
         return GroupManage
+
+    def get_obj_perms_organization_select_form(self, request):
+        """
+        Returns form class for selecting a group for permissions management.  By
+        default :form:`GroupManage` is returned.
+        """
+        return OrganizationManage
 
     def get_obj_perms_manage_user_form(self, request):
         """
@@ -542,3 +566,20 @@ class GroupManage(forms.Form):
         except Group.DoesNotExist:
             raise forms.ValidationError(
                 self.fields['group'].error_messages['does_not_exist'])
+
+
+class OrganizationManage(forms.Form):
+    organization = forms.CharField(max_length=80, error_messages={'does_not_exist':
+                                                                      _("This organization does not exist")})
+
+    def clean_organization(self):
+        """
+        Returns ``Group`` instance based on the given group name.
+        """
+        name = self.cleaned_data['organization']
+        try:
+            org = Organization.objects.get(name=name)
+            return org
+        except Organization.DoesNotExist:
+            raise forms.ValidationError(
+                self.fields['organization'].error_messages['does_not_exist'])
