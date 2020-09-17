@@ -24,7 +24,7 @@ class BaseObjectPermission(models.Model):
     def __str__(self):
         return '{} | {} | {}'.format(
             str(self.content_object),
-            str(getattr(self, 'user', False) or self.group or self.organization),
+            str(getattr(self, 'user', False) or getattr(self, 'group', False) or getattr(self, 'organization', False)),
             str(self.permission.codename))
 
     def save(self, *args, **kwargs):
