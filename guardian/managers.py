@@ -18,13 +18,13 @@ class BaseObjectPermissionManager(models.Manager):
         try:
             self.model._meta.get_field('user')
             return 'user'
-        except models.fields.FieldDoesNotExist:
+        except FieldDoesNotExist:
             pass
 
         try:
             self.model._meta.get_field('group')
             return 'group'
-        except models.fields.FieldDoesNotExist:
+        except FieldDoesNotExist:
             pass
         return 'organization'
 
